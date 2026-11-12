@@ -33,6 +33,8 @@ jobs:
       - name: Publish errors to job summary
         if: always()
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if (Test-Path build.log) {
             $lines = Get-Content build.log
@@ -48,7 +50,10 @@ jobs:
               $body | Out-File $env:GITHUB_STEP_SUMMARY -Append
             }
             if ($body) {
-              "```" + $body + "```" | gh api "repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/comments" -f body=- --input - 2>$null
+              $payload = @{ body = "``````n$body``````" } | ConvertTo-Json
+              Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/comments" `
+                -Method Post -Body $payload -ContentType 'application/json' `
+                -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' } | Out-Null
             }
           } else {
             "build.log was not created." | Out-File $env:GITHUB_STEP_SUMMARY -Append
