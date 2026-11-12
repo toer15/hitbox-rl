@@ -1,6 +1,5 @@
 import type { Car, HitboxId } from '../types';
 import { slugify } from '../lib/slug';
-import { CAR_PRODUCT_IDS } from './productIds';
 
 /**
  * Every car body currently listed on Epic's official Rocket League hitbox
@@ -228,7 +227,6 @@ function buildCars(): Car[] {
         id: seen === 0 ? base : `${base}-${seen + 1}`,
         name,
         hitbox,
-        ...(CAR_PRODUCT_IDS[name] ? { productId: CAR_PRODUCT_IDS[name] } : {}),
       });
     }
   }

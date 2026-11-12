@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { HitboxId, Loadout, Preset, UpdateState } from './types';
-import { BOOSTS, CARS, HITBOXES, WORKSHOP_MAPS, getBoost, getCar } from './data';
+import { BOOSTS, CARS, HITBOXES, WORKSHOP_MAPS, getCar } from './data';
 import {
   DEFAULT_LOADOUT,
   exportPresetFile,
@@ -47,13 +47,6 @@ interface ToastState {
   key: number;
 }
 
-interface ApplyState {
-  status: 'idle' | 'working' | 'ok' | 'error';
-  note: string | null;
-}
-
-const APPLY_IDLE: ApplyState = { status: 'idle', note: null };
-
 export default function App() {
   const [tab, setTab] = useState<Tab>('garage');
   const [loadout, setLoadout] = useState<Loadout>(DEFAULT_LOADOUT);
@@ -64,8 +57,7 @@ export default function App() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [version, setVersion] = useState('1.0.2');
   const [modEnabled, setModEnabled] = useState<boolean>(readModEnabled);
-  const [applyState, setApplyState] = useState<ApplyState>(APPLY_IDLE);
-  const [bridgeReady, setBridgeReady] = useState(false);
+  const [velocityReady, setVelocityReady] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: 'idle',
@@ -126,9 +118,9 @@ export default function App() {
     const poll = async () => {
       try {
         const status = await api.setupStatus();
-        if (alive) setBridgeReady(status.bridgePlugin === true);
+        if (alive) setVelocityReady(status.velocity != null);
       } catch {
-        // The bridge status only drives the in-game card; keep last known.
+        // The Velocity status only drives the in-game card; keep last known.
       }
     };
     void poll();
@@ -289,35 +281,12 @@ export default function App() {
     setTab('garage');
   };
 
-  const applyToGame = async () => {
-    if (applyState.status === 'working') return;
-    setApplyState({ status: 'working', note: null });
-    const bodyProductId = (getCar(loadout.carId)?.productId ?? 0) || 0;
-    const boostProductId = (getBoost(loadout.boostId)?.productId ?? 0) || 0;
-    const hasMappedBody = bodyProductId > 0;
-    const result = await window.hitboxDesktop?.applyToGame({
-      enabled: modEnabled,
-      bodyProductId,
-      boostProductId,
-      primary: loadout.stockPaint ? null : loadout.primary,
-      secondary: loadout.stockPaint ? null : loadout.secondary,
-      asIs: loadout.stockPaint,
-    });
-    if (!result || !result.ok) {
-      setApplyState({ status: 'error', note: result?.error ?? 'Could not reach the bridge.' });
-      return;
+  const openVelocity = async () => {
+    const result = await window.hitboxDesktop?.launchVelocity();
+    if (!result?.ok) {
+      notify(result?.error ?? 'Could not open VelocityRL.', 'error');
+      setTab('setup');
     }
-    const parts: string[] = [];
-    parts.push(modEnabled ? 'Loadout written to the bridge.' : 'Bridge switched off.');
-    if (modEnabled && hasMappedBody) {
-      parts.push('In freeplay the car is real (true hitbox). Online it is visual only.');
-    } else if (modEnabled && !hasMappedBody) {
-      parts.push(
-        `Item ids for “${getCar(loadout.carId)?.name}” are not mapped yet — paint/boost still apply. Equip it in freeplay and run hitbox_dumploadout to map it.`,
-      );
-    }
-    parts.push('If Rocket League is already running, give the bridge up to 2 seconds.');
-    setApplyState({ status: 'ok', note: parts.join(' ') });
   };
 
   const counts: Record<Tab, number> = {
@@ -412,9 +381,8 @@ export default function App() {
               hitboxFilter={hitboxFilter}
               onHitboxFilter={setHitboxFilter}
               onOpenHitboxLab={() => setTab('hitboxes')}
-              onApplyToGame={() => void applyToGame()}
-              applyState={applyState}
-              bridgeReady={bridgeReady}
+              velocityReady={velocityReady}
+              onOpenVelocity={() => void openVelocity()}
               onOpenSetup={() => setTab('setup')}
             />
           )}

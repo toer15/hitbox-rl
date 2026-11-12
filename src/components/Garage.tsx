@@ -31,9 +31,8 @@ interface GarageProps {
   hitboxFilter: HitboxId | 'all';
   onHitboxFilter: (id: HitboxId | 'all') => void;
   onOpenHitboxLab: () => void;
-  onApplyToGame: () => void;
-  applyState: { status: 'idle' | 'working' | 'ok' | 'error'; note: string | null };
-  bridgeReady: boolean;
+  velocityReady: boolean;
+  onOpenVelocity: () => void;
   onOpenSetup: () => void;
 }
 
@@ -55,9 +54,8 @@ export function Garage({
   hitboxFilter,
   onHitboxFilter,
   onOpenHitboxLab,
-  onApplyToGame,
-  applyState,
-  bridgeReady,
+  velocityReady,
+  onOpenVelocity,
   onOpenSetup,
 }: GarageProps) {
   const [carQuery, setCarQuery] = useState('');
@@ -276,31 +274,23 @@ export function Garage({
             <b>↳</b> In game
           </div>
           <div className="panel-title">Show it in Rocket League</div>
-          {bridgeReady ? (
+          {velocityReady ? (
             <>
               <div className="save-actions">
-                <button
-                  className="btn primary"
-                  onClick={onApplyToGame}
-                  disabled={applyState.status === 'working'}
-                >
-                  <Icon name="power" size={14} />
-                  {applyState.status === 'working' ? 'Applying…' : 'Apply in game'}
+                <button className="btn primary" onClick={onOpenVelocity}>
+                  <Icon name="play" size={14} /> Open VelocityRL
                 </button>
               </div>
-              {applyState.note && (
-                <p className={`hint ${applyState.status === 'error' ? 'error' : ''}`}>{applyState.note}</p>
-              )}
               <p className="hint">
-                Freeplay / offline: the car is real, so you get its <b>true hitbox</b>. Online: only what you
-                see changes; the hitbox still follows the body you actually have equipped.
+                Design the look here, then recreate it once as a <b>VelocityRL preset</b> — spawn the same body,
+                boost and paint colours there and it applies in game client-side, with one-click restore.
               </p>
             </>
           ) : (
             <>
               <p className="hint">
-                To see this loadout in game, the HITBOX bridge needs a one-time setup: BakkesMod + the bridge
-                plugin. HITBOX can install both for you.
+                To see your loadout in game, HITBOX needs VelocityRL — the client-side item spawner. Setup
+                installs it for you in one click.
               </p>
               <div className="save-actions">
                 <button className="btn primary" onClick={onOpenSetup}>

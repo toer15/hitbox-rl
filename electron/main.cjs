@@ -19,11 +19,8 @@ const DOWNLOAD_HOSTS = new Set([
   'release-assets.githubusercontent.com',
   'raw.githubusercontent.com',
   'codeload.github.com',
-  'bakkesmod.com',
   'api.steampowered.com',
 ]);
-const BAKKESMOD_INSTALLER_URL =
-  'https://github.com/bakkesmodorg/BakkesModInjectorCpp/releases/latest/download/BakkesModSetup.zip';
 const VELOCITY_RELEASE_API = 'https://api.github.com/repos/bitsfdb/VelocityRL/releases/latest';
 const VELOCITY_APP_DIR_CANDIDATES = [
   () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'velocity-rl'),
@@ -45,6 +42,25 @@ function velocityInstalled() {
   return null;
 }
 
+function velocityExecutable() {
+  const dir = velocityInstalled();
+  if (!dir) return null;
+  try {
+    const exe = fsSync.readdirSync(dir).find((entry) => /\.exe$/i.test(entry) && !/uninstall/i.test(entry));
+    return exe ? path.join(dir, exe) : null;
+  } catch {
+    return null;
+  }
+}
+
+function launchVelocity() {
+  const exe = velocityExecutable();
+  if (!exe) {
+    return { ok: false, error: 'VelocityRL is not installed yet (Setup → step 2).' };
+  }
+  return launchExecutable(exe);
+}
+
 async function latestVelocityInstaller() {
   const raw = await fetchUrl(VELOCITY_RELEASE_API);
   const release = JSON.parse(raw.toString('utf8'));
@@ -52,52 +68,6 @@ async function latestVelocityInstaller() {
   if (!asset) throw new Error('VelocityRL has no Windows installer in its latest release right now.');
   return asset.browser_download_url;
 }
-const HITBOX_REPO = 'toer15/hitbox-rl';
-const BRIDGE_DLL_NAME = 'HitboxBridge.dll';
-
-// ---------------------------------------------------------------------------
-// Game bridge: detection, one-click installs and the live loadout file.
-// ---------------------------------------------------------------------------
-
-function homeAppData() {
-  return process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
-}
-
-function defaultBakkesModFolder() {
-  return path.join(homeAppData(), 'bakkesmod');
-}
-
-function bakkesModInstalled() {
-  return fsSync.existsSync(path.join(defaultBakkesModFolder(), 'bakkesmod.exe')) ||
-    fsSync.existsSync(path.join(defaultBakkesModFolder(), 'plugins'));
-}
-
-/** The plugin reports the real BakkesMod folder through a status file. */
-function readBridgeStatus() {
-  const statusPath = path.join(defaultBakkesModFolder(), 'hitbox_bridge.txt');
-  try {
-    const text = fsSync.readFileSync(statusPath, 'utf8');
-    const fields = {};
-    for (const line of text.split(/\r?\n/)) {
-      const eq = line.indexOf('=');
-      if (eq > 0) fields[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
-    }
-    return fields;
-  } catch {
-    return {};
-  }
-}
-
-function bridgeFolder() {
-  const reported = readBridgeStatus().bmfolder;
-  if (reported && fsSync.existsSync(reported)) return reported;
-  return defaultBakkesModFolder();
-}
-
-function bridgePluginInstalled() {
-  return fsSync.existsSync(path.join(bridgeFolder(), 'plugins', BRIDGE_DLL_NAME));
-}
-
 function fetchUrl(url, redirects = 5) {
   return new Promise((resolve, reject) => {
     if (redirects <= 0) {
@@ -142,77 +112,6 @@ function fetchUrl(url, redirects = 5) {
 
 function downloadToFile(url, destination) {
   return fetchUrl(url).then((buffer) => fs.writeFile(destination, buffer));
-}
-
-function runInstaller(filePath) {
-  return new Promise((resolve) => {
-    try {
-      const child = spawn(filePath, [], { detached: true, stdio: 'ignore' });
-      child.once('error', (error) => resolve({ ok: false, error: String(error) }));
-      child.once('spawn', () => {
-        child.unref();
-        resolve({ ok: true });
-      });
-    } catch (error) {
-      resolve({ ok: false, error: String(error) });
-    }
-  });
-}
-
-async function extractZip(zipPath, destination) {
-  await fs.mkdir(destination, { recursive: true });
-  await new Promise((resolve, reject) => {
-    const child = spawn(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destination}' -Force`,
-      ],
-      { stdio: 'ignore' },
-    );
-    child.once('error', reject);
-    child.once('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Expand-Archive exited with ${code}.`))));
-  });
-}
-
-async function latestBridgeAsset() {
-  const raw = await fetchUrl(`https://api.github.com/repos/${HITBOX_REPO}/releases/latest`);
-  const release = JSON.parse(raw.toString('utf8'));
-  const asset = (release.assets ?? []).find((entry) => entry.name === BRIDGE_DLL_NAME);
-  if (!asset) throw new Error('The HitboxBridge.dll has not been published yet. Build it with the plugin workflow first.');
-  return asset.browser_download_url;
-}
-
-async function writeLiveLoadout(live) {
-  const folder = bridgeFolder();
-  await fs.mkdir(path.join(folder, 'plugins'), { recursive: true });
-  const lines = [
-    `rev=${live.rev}`, `enabled=${live.enabled ? 1 : 0}`, `body=${live.bodyProductId}`,
-    `boost=${live.boostProductId}`, `asis=${live.asIs ? 1 : 0}`,
-  ];
-  if (live.primary) lines.push(`primary=${live.primary}`);
-  if (live.secondary) lines.push(`secondary=${live.secondary}`);
-  const livePath = path.join(folder, 'hitbox_live.txt');
-  await fs.writeFile(livePath, `${lines.join('\n')}\n`, 'utf8');
-  return livePath;
-}
-
-async function readDumpedLoadout() {
-  const dumpPath = path.join(bridgeFolder(), 'hitbox_dump.txt');
-  try {
-    const text = await fs.readFile(dumpPath, 'utf8');
-    const slots = {};
-    for (const line of text.split(/\r?\n/)) {
-      const slot = line.match(/slot=(-?\d+)/);
-      const product = line.match(/product=(\d+)/);
-      if (slot && product) slots[Number(slot[1])] = Number(product[1]);
-    }
-    return { ok: true, slots, path: dumpPath };
-  } catch {
-    return { ok: false, error: 'No dump found. In game (freeplay), run the console command: hitbox_dumploadout' };
-  }
 }
 
 function steamLookupWorkshop(id) {
@@ -943,94 +842,26 @@ app.whenReady().then(() => {
 
   ipcMain.handle('setup:status', () => ({
     rocketLeague: findAnyRocketLeague(),
-    bakkesMod: bakkesModInstalled(),
-    bridgePlugin: bridgePluginInstalled(),
     velocity: velocityInstalled(),
-    bridgeFolder: bridgeFolder(),
-    bridgeStatus: readBridgeStatus(),
   }));
-
-  ipcMain.handle('setup:installBakkesMod', async () => {
-    try {
-      const tempZip = path.join(os.tmpdir(), 'BakkesModSetup.zip');
-      await downloadToFile(BAKKESMOD_INSTALLER_URL, tempZip);
-      const tempDir = path.join(os.tmpdir(), 'bakkesmod-setup');
-      await extractZip(tempZip, tempDir);
-      const entries = await fs.readdir(tempDir);
-      const setup = entries.find((entry) => /setup\.exe$/i.test(entry));
-      if (!setup) throw new Error('The BakkesMod installer did not extract a setup exe.');
-      const result = await runInstaller(path.join(tempDir, setup));
-      if (!result.ok) return result;
-      return {
-        ok: true,
-        note: 'BakkesMod setup is running. Finish its wizard, then click Re-check here.',
-      };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
-
-  ipcMain.handle('setup:installPlugin', async () => {
-    if (!bakkesModInstalled()) {
-      return { ok: false, error: 'Install BakkesMod first (step 2).' };
-    }
-    try {
-      const url = await latestBridgeAsset();
-      const pluginsDir = path.join(bridgeFolder(), 'plugins');
-      await fs.mkdir(pluginsDir, { recursive: true });
-      await downloadToFile(url, path.join(pluginsDir, BRIDGE_DLL_NAME));
-      return {
-        ok: true,
-        note: 'Bridge installed. Restart Rocket League (or press F5 in the BakkesMod console) to load it.',
-      };
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  });
 
   ipcMain.handle('setup:installVelocity', async () => {
     try {
       const url = await latestVelocityInstaller();
       const installer = path.join(os.tmpdir(), 'VelocityRL-setup.exe');
       await downloadToFile(url, installer);
-      const result = await runInstaller(installer);
-      if (!result.ok) return result;
+      const error = await shell.openPath(installer);
+      if (error) return { ok: false, error };
       return {
         ok: true,
-        note: 'VelocityRL setup is running. Finish its wizard — it is maintained daily, so it never waits for a BakkesMod update.',
+        note: 'VelocityRL setup is running. Finish its wizard — it is maintained daily, so it never waits for a mod update after a Rocket League patch.',
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
 
-  ipcMain.handle('bridge:apply', async (_event, live) => {
-    if (!live || typeof live !== 'object') return { ok: false, error: 'Invalid live loadout.' };
-    if (!bridgePluginInstalled()) {
-      return { ok: false, error: 'The HITBOX bridge plugin is not installed yet (Setup).' };
-    }
-    try {
-      const livePath = await writeLiveLoadout({
-        rev: Date.now() % 1000000000,
-        enabled: live.enabled === true,
-        bodyProductId: Number(live.bodyProductId) || 0,
-        boostProductId: Number(live.boostProductId) || 0,
-        asIs: live.asIs === true,
-        primary: typeof live.primary === 'string' && /^#[0-9a-fA-F]{6}$/.test(live.primary) ? live.primary : null,
-        secondary: typeof live.secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(live.secondary) ? live.secondary : null,
-      });
-      return { ok: true, path: livePath };
-    } catch (error) {
-      return { ok: false, error: String(error) };
-    }
-  });
-
-  ipcMain.handle('bridge:readDump', () => readDumpedLoadout());
-
-  ipcMain.handle('bridge:openFolder', async () => {
-    const error = await shell.openPath(bridgeFolder());
-    return error ? { ok: false, error } : { ok: true, path: bridgeFolder() };
-  });
+  ipcMain.handle('setup:launchVelocity', () => launchVelocity());
 
   ipcMain.handle('maps:lookup', async (_event, id) => {
     if (typeof id !== 'string' || !/^\d{5,12}$/.test(id.trim())) {

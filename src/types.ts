@@ -17,16 +17,12 @@ export interface Car {
   id: string;
   name: string;
   hitbox: HitboxId;
-  /** Game product id, used by the in-game bridge. 0 = not mapped yet. */
-  productId?: number;
 }
 
 export interface Boost {
   id: string;
   name: string;
   tone: string;
-  /** Game product id, used by the in-game bridge. 0 = not mapped yet. */
-  productId?: number;
 }
 
 export interface PaintFinish {
@@ -131,21 +127,8 @@ export interface DesktopResult<T = undefined> {
 
 export interface SetupStatus {
   rocketLeague: string | null;
-  bakkesMod: boolean;
-  bridgePlugin: boolean;
-  /** Install dir of the VelocityRL alternative (null when not installed). */
+  /** Install dir of the VelocityRL item spawner (null when not installed). */
   velocity?: string | null;
-  bridgeFolder?: string;
-  bridgeStatus?: Record<string, string>;
-}
-
-export interface LiveApplyRequest {
-  enabled: boolean;
-  bodyProductId: number;
-  boostProductId: number;
-  primary: string | null;
-  secondary: string | null;
-  asIs: boolean;
 }
 
 export interface DesktopApi {
@@ -161,12 +144,8 @@ export interface DesktopApi {
   launchGame: () => Promise<DesktopResult>;
   setupStatus: () => Promise<SetupStatus>;
   browseRocketLeague: () => Promise<DesktopResult>;
-  installBakkesMod: () => Promise<DesktopResult>;
-  installBridgePlugin: () => Promise<DesktopResult>;
   installVelocity: () => Promise<DesktopResult>;
-  applyToGame: (live: LiveApplyRequest) => Promise<DesktopResult>;
-  readLoadoutDump: () => Promise<DesktopResult>;
-  openBridgeFolder: () => Promise<DesktopResult>;
+  launchVelocity: () => Promise<DesktopResult>;
   lookupWorkshopMap: (id: string) => Promise<DesktopResult>;
   checkForUpdates: () => Promise<UpdateResult>;
   installUpdate: () => Promise<DesktopResult>;

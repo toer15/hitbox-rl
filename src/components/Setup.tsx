@@ -11,7 +11,7 @@ interface Step {
   title: string;
   detail: string;
   done: boolean;
-  action?: 'rl' | 'bakkesmod' | 'plugin' | 'open';
+  action?: 'rl' | 'velocity';
   actionLabel?: string;
 }
 
@@ -67,15 +67,7 @@ export function Setup({ onNotify }: SetupProps) {
     setBusy(id);
     try {
       const result: DesktopResult =
-        id === 1
-          ? await api.browseRocketLeague()
-          : id === 2
-            ? await api.installBakkesMod()
-            : id === 3
-              ? await api.installBridgePlugin()
-              : id === 4
-                ? await api.installVelocity()
-                : { ok: true };
+        id === 1 ? await api.browseRocketLeague() : id === 2 ? await api.installVelocity() : { ok: true };
       if (!result.ok) onNotify(result.error ?? 'Setup step failed.', 'error');
       else if (result.note) onNotify(result.note);
       else onNotify('Done.');
@@ -102,8 +94,6 @@ export function Setup({ onNotify }: SetupProps) {
   }
 
   const rl = status?.rocketLeague ?? null;
-  const bakkes = status?.bakkesMod ?? false;
-  const plugin = status?.bridgePlugin ?? false;
   const velocity = status?.velocity ?? null;
 
   const steps: Step[] = [
@@ -119,27 +109,17 @@ export function Setup({ onNotify }: SetupProps) {
     },
     {
       id: 2,
-      title: 'BakkesMod (client-side mod loader)',
-      detail: bakkes
-        ? 'Installed. This is the official, ban-safe client mod loader for Rocket League.'
-        : 'Needed so HITBOX can show your loadout in game. One click — HITBOX downloads the official BakkesModSetup and starts its installer for you.',
-      done: bakkes,
-      action: 'bakkesmod',
-      actionLabel: 'Download & install',
-    },
-    {
-      id: 3,
-      title: 'HITBOX bridge plugin',
-      detail: plugin
-        ? 'Installed into the BakkesMod plugins folder. It reads your live loadout and applies it in game.'
-        : 'A small plugin built by the HITBOX project. One click downloads it from GitHub Releases into the right folder.',
-      done: plugin,
-      action: 'plugin',
+      title: 'VelocityRL (in-game item spawner)',
+      detail: velocity
+        ? `Installed at ${velocity}`
+        : 'The client-side app that puts your items on screen in game. Free, open source, and maintained daily — it never waits for a mod update after a Rocket League patch. One click downloads the official installer.',
+      done: Boolean(velocity),
+      action: 'velocity',
       actionLabel: 'Download & install',
     },
   ];
 
-  const allDone = rl && bakkes && plugin;
+  const allDone = Boolean(rl && velocity);
 
   return (
     <div className="setup-wrap">
@@ -157,9 +137,8 @@ export function Setup({ onNotify }: SetupProps) {
         </div>
 
         <p className="hint">
-          HITBOX changes only what <b>you</b> see on your screen. It does not unlock items, does not touch other
-          players, and does not modify gameplay. BakkesMod is the long-standing client-side mod loader the Rocket
-          League community has used for years with cosmetic mods.
+          HITBOX changes only what <b>you</b> see on your screen. It does not unlock items on any server, does not
+          touch other players, and does not modify gameplay. VelocityRL applies everything client-side.
         </p>
 
         <div className="setup-steps">
@@ -168,45 +147,20 @@ export function Setup({ onNotify }: SetupProps) {
           ))}
         </div>
 
-        {plugin && (
+        {velocity && (
           <p className="hint">
-            After installing the plugin, (re)start Rocket League <b>through BakkesMod</b>. In freeplay the bridge
-            applies your loadout automatically. Console commands:{' '}
-            <code>hitbox_reload</code>, <code>hitbox_apply</code>, <code>hitbox_dumploadout</code>.
+            Inside VelocityRL, spawn the car body, boost, paint and title you designed here and save them as a
+            VelocityRL preset — it can switch presets anytime and restore everything to vanilla with one click.
           </p>
         )}
 
-        <section className="setup-alt">
-          <div className="setup-alt-head">
-            <div>
-              <b>Plan B — VelocityRL (never out of date)</b>
-              <p>
-                If BakkesMod is “out of date, waiting for an update” after a Rocket League patch, VelocityRL is a
-                free, open-source item spawner and preset app that is maintained daily and does not depend on
-                BakkesMod at all. Spawn any car body, boost, paint or title client-side, save presets, and restore
-                everything with one click.
-              </p>
-            </div>
-            {velocity ? (
-              <button className="btn small installed-btn" disabled title="Already installed — launch it from the Start menu">
-                <Icon name="check" size={12} /> Installed
-              </button>
-            ) : (
-              <button className="btn small primary" disabled={busy === 4} onClick={() => void handleAction(4)}>
-                <Icon name="download" size={12} /> {busy === 4 ? 'Working…' : 'Download & install'}
-              </button>
-            )}
-          </div>
-          {velocity && <p className="hint">Found at <code>{velocity}</code></p>}
-        </section>
-
         {allDone && (
           <div className="save-actions">
-            <button className="btn primary" onClick={() => void window.hitboxDesktop?.launchGame()}>
-              <Icon name="play" size={13} /> Launch Rocket League
+            <button className="btn primary" onClick={() => void window.hitboxDesktop?.launchVelocity()}>
+              <Icon name="play" size={13} /> Open VelocityRL
             </button>
-            <button className="btn" onClick={() => void window.hitboxDesktop?.openBridgeFolder()}>
-              Open bridge folder
+            <button className="btn" onClick={() => void window.hitboxDesktop?.launchGame()}>
+              Launch Rocket League
             </button>
           </div>
         )}
@@ -214,4 +168,3 @@ export function Setup({ onNotify }: SetupProps) {
     </div>
   );
 }
-

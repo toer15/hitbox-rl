@@ -11,17 +11,10 @@ A desktop app for building client-side cosmetic loadouts and finding Rocket Leag
 
 The Setup tab walks through what HITBOX needs to put your loadout on screen in Rocket League, and installs it for you:
 
-1. **Rocket League** — auto-detected (Epic or Steam).
-2. **BakkesMod** — the community's long-standing client-side mod loader. One click downloads the official installer and starts it.
-3. **HITBOX bridge plugin** — a small plugin built by this repo (see the `bakkesmod-plugin/` folder, compiled by the `Build Hitbox bridge plugin` GitHub Actions workflow and attached to releases). One click downloads it into the BakkesMod plugins folder.
+1. **Rocket League** — auto-detected, or browse to `RocketLeague.exe` once and HITBOX remembers it forever.
+2. **VelocityRL** — the client-side item spawner HITBOX uses to show items in game. Free, open source, and maintained daily, so it never waits for a mod update after a Rocket League patch. One click downloads the official installer and starts it.
 
-After that, hit **Apply in game** in the Garage. The bridge reads the live loadout and applies it client-side:
-
-- **Paint** — any colour you picked (primary and secondary), applied as real colour overrides. The **As is** toggle leaves factory team paint alone.
-- **Boost** — any boost with a mapped product id.
-- **Car body** — in **freeplay / offline training** the chosen body is the real body, hitbox included. In **online matches** the server still owns the hitbox, so only the visuals change and your car handles like the body you actually have equipped.
-
-Console commands in game: , ,  (dumps your currently equipped item ids to  so new bodies/boosts can be mapped — see `src/data/productIds.ts`).
+Design the loadout here — car body, boost, any colour, the **As is** toggle for factory paint — then recreate it as a VelocityRL preset in game. Everything is client-side: only your screen changes.
 
 The Mod maps tab also has an **Add map** box: paste any Steam Workshop link or item ID and HITBOX fetches the real title, author and size straight from Steam, so your shelf can hold every map the community has ever released, not just the curated list.
 
