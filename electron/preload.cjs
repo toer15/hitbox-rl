@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('hitboxDesktop', {
   browseRocketLeague: () => ipcRenderer.invoke('setup:browseRocketLeague'),
   installVelocity: () => ipcRenderer.invoke('setup:installVelocity'),
   launchVelocity: () => ipcRenderer.invoke('setup:launchVelocity'),
+  applyLoadoutToVelocity: (payload) => ipcRenderer.invoke('bridge:writeSwaps', payload),
   lookupWorkshopMap: (id) => ipcRenderer.invoke('maps:lookup', id),
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),

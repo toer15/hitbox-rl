@@ -54,6 +54,116 @@ function velocityInstalled() {
   return null;
 }
 
+function velocityProxyDir() {
+  const override = process.env['VELOCITY_PROXY_DIR'];
+  if (override) return override;
+  if (process.env.APPDATA) return path.join(process.env.APPDATA, 'VelocityRL', 'proxy');
+  if (process.env.LOCALAPPDATA) return path.join(process.env.LOCALAPPDATA, 'VelocityRL', 'proxy');
+  return null;
+}
+
+function velocityAppDir() {
+  if (process.env.APPDATA) return path.join(process.env.APPDATA, 'com.velocityrl.app');
+  return null;
+}
+
+function velocitySwapPaths() {
+  const paths = [];
+  const proxy = velocityProxyDir();
+  if (proxy) paths.push(path.join(proxy, 'swaps.json'));
+  const appDir = velocityAppDir();
+  if (appDir) paths.push(path.join(appDir, 'swaps.json'));
+  return paths.filter((p) => {
+    try {
+      fsSync.mkdirSync(path.dirname(p), { recursive: true });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function readExistingSwaps() {
+  for (const p of velocitySwapPaths()) {
+    try {
+      const raw = fsSync.readFileSync(p, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Missing or unreadable; try the next candidate.
+    }
+  }
+  return [];
+}
+
+// Matches VelocityRL's upk_slot_index_from_str ("body"=0, "boost"=3, ...).
+const SLOT_INDEX = {
+  Body: 0,
+  'Paint Finish': 7,
+  'Rocket Boost': 3,
+  Wheels: 2,
+  Antenna: 4,
+  Topper: 5,
+  Trail: 14,
+  'Engine Audio': 13,
+  'Player Banner': 16,
+  'Goal Explosion': 15,
+};
+
+// Hand the current loadout to VelocityRL: the proxy reads swaps.json fresh
+// from disk on every request, so writing here is what actually makes the
+// selected car/boost/paint show up in game client-side.
+function velocityApplyLoadout(payload) {
+  if (!payload || typeof payload !== 'object') return { ok: false, error: 'Invalid payload.' };
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  if (!items.length) return { ok: false, error: 'Nothing to apply.' };
+
+  if (!velocityInstalled()) {
+    return { ok: false, error: 'VelocityRL is not installed yet. Open the Setup tab first.' };
+  }
+
+  const entries = items.slice(0, 64).map((item) => {
+    const wantedId = Number(item.productId);
+    if (!Number.isFinite(wantedId) || wantedId <= 0) return null;
+    const slot = typeof item.slot === 'string' ? item.slot : 'Body';
+    const paintId = Number.isFinite(item.paintId) ? Math.max(0, Math.min(29, item.paintId)) : 0;
+    return {
+      owned_id: wantedId,
+      wanted_id: wantedId,
+      owned_name: String(item.name ?? '').slice(0, 120),
+      wanted_name: String(item.name ?? '').slice(0, 120),
+      owned_paint_id: null,
+      owned_custom_hex: null,
+      paint_id: paintId,
+      custom_paint_hex: null,
+      asset_package: String(item.assetPackage ?? '').slice(0, 200),
+      slot,
+      slot_index: SLOT_INDEX[slot] ?? 0,
+      timestamp: new Date().toISOString(),
+    };
+  }).filter(Boolean);
+
+  if (!entries.length) {
+    return { ok: false, error: 'None of the selected items map to an in-game product. You may not have that item in your library.' };
+  }
+
+  const paths = velocitySwapPaths();
+  if (!paths.length) return { ok: false, error: 'Could not find the VelocityRL data folder.' };
+
+  let written = 0;
+  let lastError = null;
+  for (const p of paths) {
+    try {
+      fsSync.writeFileSync(p, JSON.stringify(entries, null, 2), 'utf8');
+      written += 1;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+    }
+  }
+  if (!written) return { ok: false, error: `Could not write swaps.json: ${lastError ?? 'unknown error'}` };
+  return { ok: true, path: paths[0], entries: entries.length };
+}
+
 function velocityExecutable() {
   const dir = velocityInstalled();
   if (!dir) return null;
@@ -877,6 +987,13 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('setup:launchVelocity', () => launchVelocity());
+  ipcMain.handle('bridge:writeSwaps', (_event, payload) => {
+    try {
+      return velocityApplyLoadout(payload);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
 
   ipcMain.handle('maps:lookup', async (_event, id) => {
     if (typeof id !== 'string' || !/^\d{5,12}$/.test(id.trim())) {

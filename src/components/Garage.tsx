@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { applyVelocityLoadout } from '../lib/desktop';
+import { PAINT_NAME_TO_ID } from '../data/productIds';
 import type { HitboxId, Loadout, Team } from '../types';
 import {
   BOOSTS,
@@ -32,7 +34,6 @@ interface GarageProps {
   onHitboxFilter: (id: HitboxId | 'all') => void;
   onOpenHitboxLab: () => void;
   velocityReady: boolean;
-  onOpenVelocity: () => void;
   onOpenSetup: () => void;
 }
 
@@ -55,9 +56,10 @@ export function Garage({
   onHitboxFilter,
   onOpenHitboxLab,
   velocityReady,
-  onOpenVelocity,
   onOpenSetup,
 }: GarageProps) {
+  const [applyState, setApplyState] = useState<'idle' | 'applying' | 'ok' | 'error'>('idle');
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [carQuery, setCarQuery] = useState('');
   const [boostQuery, setBoostQuery] = useState('');
   const [paintTarget, setPaintTarget] = useState<PaintTarget>('primary');
@@ -104,6 +106,34 @@ export function Garage({
   };
 
   const setTeam = (team: Team) => onChange({ team });
+
+  // Paint picker hex → closest VelocityRL paint id (0 = none / as-is).
+  const paintIdForHex = (hex: string) => {
+    const color = PAINT_COLORS.find((c) => c.hex.toUpperCase() === hex.toUpperCase());
+    if (!color) return 0;
+    return PAINT_NAME_TO_ID[color.name] ?? 0;
+  };
+
+  const handleApplyToGame = async () => {
+    setApplyState('applying');
+    setApplyError(null);
+    try {
+      const result = await applyVelocityLoadout({
+        carName: car.name,
+        boostName: boost?.name ?? null,
+        paintId: paintIdForHex(primary),
+      });
+      if (result.ok) {
+        setApplyState('ok');
+      } else {
+        setApplyError(result.error ?? 'Could not apply the loadout.');
+        setApplyState('error');
+      }
+    } catch {
+      setApplyError('Could not reach the game bridge.');
+      setApplyState('error');
+    }
+  };
 
   return (
     <div className="garage">
@@ -279,27 +309,13 @@ export function Garage({
               <div className="save-actions">
                 <button
                   className="btn primary"
-                  onClick={() => {
-                    // Isolate the current setup/preview selections. These reflect
-                    // what the user picked in the UI right now, without committing
-                    // anything to the persistent loadout state.
-                    const setupPayload = {
-                      carId: car.id,
-                      carName: car.name,
-                      hitbox: hitbox.id,
-                      boostId: boost?.id ?? null,
-                      team: loadout.team,
-                      primaryColor: primary,
-                      secondaryColor: secondary,
-                      finishPrimary,
-                      finishSecondary,
-                    };
-                    console.log('[HITBOX] preparing setup handoff:', setupPayload);
-                    onOpenVelocity();
-                  }}
+                  onClick={() => void handleApplyToGame()}
+                  disabled={applyState === 'applying'}
                 >
-                  <Icon name="play" size={14} /> Send to game
+                  <Icon name="play" size={14} /> {applyState === 'applying' ? 'Sending…' : 'Send to game'}
                 </button>
+                {applyState === 'ok' && <p className="hint ok">Applied in game — relaunch Rocket League if it is running to see it.</p>}
+                {applyState === 'error' && <p className="hint error">{applyError}</p>}
               </div>
               <p className="hint">
                 Design the look here, then recreate it once as a <b>VelocityRL preset</b> — spawn the same body,

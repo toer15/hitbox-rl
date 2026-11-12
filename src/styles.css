@@ -2302,6 +2302,10 @@ h2 {
   color: #ff8d97;
 }
 
+.apply-card .hint.ok {
+  color: #8bf0c0;
+}
+
 .setup-card .hint code {
   background: rgba(255, 255, 255, 0.07);
   padding: 1px 6px;

@@ -281,14 +281,6 @@ export default function App() {
     setTab('garage');
   };
 
-  const openVelocity = async () => {
-    const result = await window.hitboxDesktop?.launchVelocity();
-    if (!result?.ok) {
-      notify(result?.error ?? 'Could not open VelocityRL.', 'error');
-      setTab('setup');
-    }
-  };
-
   const counts: Record<Tab, number> = {
     garage: CARS.length,
     hitboxes: HITBOXES.length,
@@ -382,7 +374,6 @@ export default function App() {
               onHitboxFilter={setHitboxFilter}
               onOpenHitboxLab={() => setTab('hitboxes')}
               velocityReady={velocityReady}
-              onOpenVelocity={() => void openVelocity()}
               onOpenSetup={() => setTab('setup')}
             />
           )}

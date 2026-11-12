@@ -131,6 +131,14 @@ export interface SetupStatus {
   velocity?: string | null;
 }
 
+export interface VelocitySwapItem {
+  name: string;
+  productId: number;
+  slot: string;
+  paintId: number;
+  assetPackage?: string;
+}
+
 export interface DesktopApi {
   version: () => Promise<string>;
   platform: () => Promise<string>;
@@ -146,6 +154,7 @@ export interface DesktopApi {
   browseRocketLeague: () => Promise<DesktopResult>;
   installVelocity: () => Promise<DesktopResult>;
   launchVelocity: () => Promise<DesktopResult>;
+  applyLoadoutToVelocity: (payload: { items: VelocitySwapItem[] }) => Promise<DesktopResult>;
   lookupWorkshopMap: (id: string) => Promise<DesktopResult>;
   checkForUpdates: () => Promise<UpdateResult>;
   installUpdate: () => Promise<DesktopResult>;

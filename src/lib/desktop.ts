@@ -1,4 +1,5 @@
-import type { DesktopResult, Loadout, Preset } from '../types';
+import type { DesktopResult, Loadout, Preset, VelocitySwapItem } from '../types';
+import { CAR_PRODUCT_IDS, BOOST_PRODUCT_IDS } from '../data/productIds';
 import { isHex, normalizeHex } from './color';
 import { slugify } from './slug';
 
@@ -158,4 +159,35 @@ export async function launchGame(): Promise<DesktopResult> {
   if (api) return api.launchGame();
   window.open('steam://rungameid/252950');
   return { ok: true };
+}
+
+/**
+ * Hand the selected car/boost/paint to VelocityRL by writing its swaps.json.
+ * The VelocityRL proxy reads swaps.json fresh from disk on every request, so
+ * this is what makes the selected car show up client-side in game.
+ */
+export async function applyVelocityLoadout(payload: {
+  carName: string;
+  boostName: string | null;
+  paintId: number;
+}): Promise<DesktopResult> {
+  const items: VelocitySwapItem[] = [];
+  if (payload.carName) {
+    const productId = CAR_PRODUCT_IDS[payload.carName];
+    if (productId) {
+      items.push({ name: payload.carName, productId, slot: 'Body', paintId: payload.paintId });
+    }
+  }
+  if (payload.boostName) {
+    const productId = BOOST_PRODUCT_IDS[payload.boostName];
+    if (productId) {
+      items.push({ name: payload.boostName, productId, slot: 'Rocket Boost', paintId: 0 });
+    }
+  }
+  if (!items.length) {
+    return { ok: false, error: 'None of the selected items map to an in-game product. That item may not exist in the item database.' };
+  }
+  const api = bridge();
+  if (!api) return { ok: false, error: 'Desktop bridge unavailable.' };
+  return api.applyLoadoutToVelocity({ items });
 }
