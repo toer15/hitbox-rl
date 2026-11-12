@@ -107,6 +107,7 @@ export interface DesktopResult<T = undefined> {
   error?: string;
   canceled?: boolean;
   path?: string;
+  method?: 'epic' | 'steam' | 'executable';
   preset?: Preset;
   presets?: Preset[];
   value?: T;

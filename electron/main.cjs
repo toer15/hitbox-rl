@@ -2,6 +2,7 @@
 
 const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
+const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
@@ -11,6 +12,10 @@ const crypto = require('node:crypto');
 const PRESET_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const ALLOWED_HOSTS = new Set(['steamcommunity.com', 'store.steampowered.com']);
 const IS_PORTABLE = Boolean(process.env.PORTABLE_EXECUTABLE_DIR);
+const STEAM_LAUNCH_URI = 'steam://rungameid/252950';
+const EPIC_LAUNCH_URI =
+  'com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true';
+const EPIC_SHORT_URI = 'com.epicgames.launcher://apps/Sugar?action=launch&silent=true';
 
 let mainWindow = null;
 let updateState = { status: 'idle', version: null, percent: null, error: null };
@@ -199,6 +204,136 @@ function workshopFolder() {
   return null;
 }
 
+function rocketLeagueExecutable(root) {
+  if (!root) return null;
+  const candidates = [
+    path.join(root, 'Binaries', 'Win64', 'RocketLeague.exe'),
+    path.join(root, 'rocketleague', 'Binaries', 'Win64', 'RocketLeague.exe'),
+    path.join(root, 'RocketLeague', 'Binaries', 'Win64', 'RocketLeague.exe'),
+  ];
+  return candidates.find((candidate) => fsSync.existsSync(candidate)) ?? null;
+}
+
+function findEpicRocketLeague() {
+  const programData = process.env.ProgramData;
+  if (programData) {
+    const launcherData = path.join(programData, 'Epic', 'UnrealEngineLauncher', 'LauncherInstalled.dat');
+    try {
+      const parsed = JSON.parse(fsSync.readFileSync(launcherData, 'utf8'));
+      for (const entry of parsed.InstallationList ?? []) {
+        if (!entry || typeof entry.InstallLocation !== 'string') continue;
+        if (entry.AppName === 'Sugar' || /rocket\s*league/i.test(entry.InstallLocation)) {
+          const executable = rocketLeagueExecutable(entry.InstallLocation);
+          if (executable) return executable;
+        }
+      }
+    } catch {
+      // Epic may not have written LauncherInstalled.dat yet.
+    }
+  }
+
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  const roots = [
+    path.join(programFiles, 'Epic Games', 'rocketleague'),
+    path.join(programFiles, 'Epic Games', 'RocketLeague'),
+    path.join(programFilesX86, 'Epic Games', 'rocketleague'),
+    path.join(programFilesX86, 'Epic Games', 'RocketLeague'),
+  ];
+  for (const root of roots) {
+    const executable = rocketLeagueExecutable(root);
+    if (executable) return executable;
+  }
+  return null;
+}
+
+function findSteamRocketLeague() {
+  for (const root of steamRoots()) {
+    const executable = rocketLeagueExecutable(path.join(root, 'steamapps', 'common', 'rocketleague'));
+    if (executable) return { executable, library: root };
+    if (fsSync.existsSync(path.join(root, 'steamapps', 'appmanifest_252950.acf'))) {
+      return { executable: null, library: root };
+    }
+  }
+  return null;
+}
+
+function hasEpicLauncher() {
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  return [
+    path.join(programFiles, 'Epic Games', 'Launcher'),
+    path.join(programFilesX86, 'Epic Games', 'Launcher'),
+  ].some((root) => fsSync.existsSync(root));
+}
+
+function hasSteam() {
+  return steamRoots().some((root) => fsSync.existsSync(path.join(root, 'steamapps')));
+}
+
+async function openProtocol(url) {
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function launchExecutable(executable) {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(executable, [], {
+        cwd: path.dirname(executable),
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.once('error', (error) => resolve({ ok: false, error: String(error) }));
+      child.once('spawn', () => {
+        child.unref();
+        resolve({ ok: true, method: 'executable', path: executable });
+      });
+    } catch (error) {
+      resolve({ ok: false, error: String(error) });
+    }
+  });
+}
+
+async function launchRocketLeague() {
+  const epic = findEpicRocketLeague();
+  if (epic) {
+    if (await openProtocol(EPIC_LAUNCH_URI)) return { ok: true, method: 'epic', path: epic };
+    if (await openProtocol(EPIC_SHORT_URI)) return { ok: true, method: 'epic', path: epic };
+    const direct = await launchExecutable(epic);
+    if (direct.ok) return direct;
+  }
+
+  const steam = findSteamRocketLeague();
+  if (steam) {
+    if (await openProtocol(STEAM_LAUNCH_URI)) {
+      return { ok: true, method: 'steam', path: steam.executable ?? undefined };
+    }
+    if (steam.executable) {
+      const direct = await launchExecutable(steam.executable);
+      if (direct.ok) return direct;
+    }
+  }
+
+  if (hasEpicLauncher()) {
+    if (await openProtocol(EPIC_LAUNCH_URI)) return { ok: true, method: 'epic' };
+    if (await openProtocol(EPIC_SHORT_URI)) return { ok: true, method: 'epic' };
+  }
+  if (hasSteam() && (await openProtocol(STEAM_LAUNCH_URI))) {
+    return { ok: true, method: 'steam' };
+  }
+
+  return {
+    ok: false,
+    error:
+      'Could not find Rocket League. Install it through Epic or Steam, or launch it once manually and try again.',
+  };
+}
+
 function isValidExternal(url) {
   try {
     const parsed = new URL(url);
@@ -268,6 +403,9 @@ function createWindow() {
                 maps: document.querySelectorAll('.map-card').length,
                 hitboxes: document.querySelectorAll('.hitbox-card').length,
                 presets: document.querySelectorAll('.preset-card').length,
+                selectedCar: document.querySelector('.car-card.selected .car-name')?.textContent ?? null,
+                carCheck: Boolean(document.querySelector('.car-card.selected .car-picked')),
+                quickSave: Boolean(document.querySelector('.quick-save')),
               });
             }
             let presetIpc = null;
@@ -325,6 +463,11 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.env.HITBOX_SMOKE === '1') {
+    console.log(
+      `[smoke] game detect ${JSON.stringify({ epic: findEpicRocketLeague(), steam: findSteamRocketLeague() })}`,
+    );
+  }
   if (process.platform === 'win32') app.setAppUserModelId('com.hitbox.rl');
   if (!process.env.VITE_DEV_SERVER_URL) {
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -462,14 +605,7 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
-  ipcMain.handle('game:launch', async () => {
-    try {
-      await shell.openExternal('steam://rungameid/252950');
-      return { ok: true };
-    } catch (error) {
-      return { ok: false, error: String(error) };
-    }
-  });
+  ipcMain.handle('game:launch', () => launchRocketLeague());
 
   ipcMain.handle('updates:state', () => updateState);
   ipcMain.handle('updates:check', () => checkForUpdates());

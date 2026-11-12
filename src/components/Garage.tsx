@@ -23,9 +23,11 @@ interface GarageProps {
   presetName: string;
   onPresetNameChange: (name: string) => void;
   onSave: () => void;
+  onQuickSave: () => void;
   onExport: () => void;
   onNew: () => void;
   editing: boolean;
+  dirty: boolean;
   hitboxFilter: HitboxId | 'all';
   onHitboxFilter: (id: HitboxId | 'all') => void;
   onOpenHitboxLab: () => void;
@@ -41,9 +43,11 @@ export function Garage({
   presetName,
   onPresetNameChange,
   onSave,
+  onQuickSave,
   onExport,
   onNew,
   editing,
+  dirty,
   hitboxFilter,
   onHitboxFilter,
   onOpenHitboxLab,
@@ -229,7 +233,9 @@ export function Garage({
               </div>
               <div className="panel-title">{editing ? 'Editing saved loadout' : 'Save this loadout'}</div>
             </div>
-            {editing && <span className="saved-badge">Saved</span>}
+            {editing && (
+              <span className={`saved-badge ${dirty ? 'unsaved' : ''}`}>{dirty ? 'Unsaved' : 'Saved'}</span>
+            )}
           </div>
           <input
             className="input"
@@ -301,6 +307,21 @@ export function Garage({
                 </button>
               ))}
             </div>
+            <button
+              className={`btn small quick-save ${dirty ? 'primary' : ''}`}
+              onClick={onQuickSave}
+              disabled={!dirty}
+              title={
+                dirty
+                  ? editing
+                    ? 'Save changes to this preset'
+                    : 'Save this loadout to your library'
+                  : 'All changes saved'
+              }
+            >
+              <Icon name={dirty ? 'save' : 'check'} size={12} />
+              {dirty ? (editing ? 'Save changes' : 'Save loadout') : 'Saved'}
+            </button>
           </div>
 
           <div className="car-grid">
@@ -311,8 +332,14 @@ export function Garage({
                   key={entry.id}
                   className={`car-card ${entry.id === car.id ? 'selected' : ''}`}
                   onClick={() => onChange({ carId: entry.id })}
+                  aria-pressed={entry.id === car.id}
                   title={`${entry.name} — ${entryHitbox.name} hitbox`}
                 >
+                  {entry.id === car.id && (
+                    <span className="car-picked" aria-hidden="true">
+                      <Icon name="check" size={9} />
+                    </span>
+                  )}
                   <span className="car-name">{entry.name}</span>
                   <span className="car-hitbox" style={{ color: entryHitbox.color }}>
                     <i className="dot" style={{ background: entryHitbox.color }} />

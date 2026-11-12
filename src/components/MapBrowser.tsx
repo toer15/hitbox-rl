@@ -106,7 +106,8 @@ export function MapBrowser({ onNotify }: MapBrowserProps) {
 
   const handleLaunch = async () => {
     const result = await launchGame();
-    if (!result.ok) onNotify(result.error ?? 'Could not launch Rocket League.', 'error');
+    if (result.ok) onNotify('Opening Rocket League…');
+    else onNotify(result.error ?? 'Could not launch Rocket League.', 'error');
   };
 
   const resetFilters = () => {

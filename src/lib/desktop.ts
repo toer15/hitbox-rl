@@ -65,9 +65,9 @@ function writeLocal(presets: Preset[]) {
 
 export async function getAppVersion(): Promise<string> {
   try {
-    return (await bridge()?.version()) ?? '1.0.0';
+    return (await bridge()?.version()) ?? '1.0.1';
   } catch {
-    return '1.0.0';
+    return '1.0.1';
   }
 }
 

@@ -53,8 +53,9 @@ export default function App() {
   const [presetName, setPresetName] = useState('Octane · Blue');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [version, setVersion] = useState('1.0.0');
+  const [version, setVersion] = useState('1.0.1');
   const [modEnabled, setModEnabled] = useState<boolean>(readModEnabled);
+  const [launching, setLaunching] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: 'idle',
     version: null,
@@ -64,6 +65,10 @@ export default function App() {
   const lastUpdateStatus = useRef<UpdateState['status']>('idle');
 
   const car = getCar(loadout.carId) ?? CARS[0];
+  const activePreset = editingId ? presets.find((preset) => preset.id === editingId) : undefined;
+  const loadoutDirty = activePreset
+    ? JSON.stringify(activePreset.loadout) !== JSON.stringify(loadout)
+    : true;
 
   useEffect(() => {
     let alive = true;
@@ -124,8 +129,8 @@ export default function App() {
     setPresets(await loadPresets());
   };
 
-  const handleSave = async () => {
-    const result = await persistPreset(presetName, loadout, editingId);
+  const saveLoadout = async (name: string) => {
+    const result = await persistPreset(name, loadout, editingId);
     if (!result.ok) {
       notify(result.error ?? 'Could not save the preset.', 'error');
       return;
@@ -135,8 +140,13 @@ export default function App() {
       setEditingId(result.preset.id);
       setPresetName(result.preset.name);
     }
-    notify('Loadout saved to your library.');
+    notify(editingId ? 'Changes saved.' : 'Loadout saved to your library.');
   };
+
+  const handleSave = () => saveLoadout(presetName);
+
+  const handleQuickSave = () =>
+    saveLoadout(editingId ? presetName : `${car.name} · ${loadout.team === 'blue' ? 'Blue' : 'Orange'}`);
 
   const handleNew = () => {
     setEditingId(null);
@@ -200,8 +210,20 @@ export default function App() {
   };
 
   const handleLaunch = async () => {
-    const result = await launchGame();
-    if (!result.ok) notify(result.error ?? 'Could not launch Rocket League.', 'error');
+    if (launching) return;
+    setLaunching(true);
+    try {
+      const result = await launchGame();
+      if (!result.ok) {
+        notify(result.error ?? 'Could not launch Rocket League.', 'error');
+        return;
+      }
+      const via =
+        result.method === 'epic' ? ' through Epic' : result.method === 'steam' ? ' through Steam' : '';
+      notify(`Opening Rocket League${via}…`);
+    } finally {
+      setLaunching(false);
+    }
   };
 
   const updateLabel =
@@ -300,9 +322,9 @@ export default function App() {
               <i />
             </span>
           </button>
-          <button className="btn ghost launch-btn" onClick={handleLaunch}>
+          <button className="btn ghost launch-btn" onClick={handleLaunch} disabled={launching}>
             <Icon name="play" size={13} />
-            Launch RL
+            {launching ? 'Launching…' : 'Launch RL'}
           </button>
           <span className="version">v{version}</span>
         </div>
@@ -319,9 +341,11 @@ export default function App() {
               presetName={presetName}
               onPresetNameChange={setPresetName}
               onSave={handleSave}
+              onQuickSave={handleQuickSave}
               onExport={handleExport}
               onNew={handleNew}
               editing={Boolean(editingId)}
+              dirty={loadoutDirty}
               hitboxFilter={hitboxFilter}
               onHitboxFilter={setHitboxFilter}
               onOpenHitboxLab={() => setTab('hitboxes')}

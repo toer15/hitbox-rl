@@ -11,6 +11,7 @@ A desktop app for building client-side cosmetic loadouts and finding Rocket Leag
 
 ### Garage
 - **Master MOD switch** — one toggle hides every chosen cosmetic at once (car, boost and paint), or brings the whole loadout back. The state persists between launches and is exported as `enabled`.
+- **Launch RL** — detects an Epic or Steam installation and opens the correct launcher. The selected car is marked in the garage, and **Save changes** appears whenever the current loadout differs from the saved preset.
 - **175 car bodies** from Epic's official hitbox list, searchable and filterable by hitbox.
 - **150+ boosts**, including standard, limited, competitive reward and legacy colourways.
 - **Paint** — any colour with a real colour picker, primary and secondary, 18 finishes including Metallic, Pearlescent, Anodized, Toon and Brushed Metal.
@@ -36,9 +37,9 @@ Auto-updates require the installed NSIS build on Windows. The portable `.exe` ca
 
 Grab the latest installer from the repository's **Releases** page:
 
-- **Windows:** `Hitbox-1.0.0-Setup.exe` or the portable `.exe`
-- **macOS:** `Hitbox-1.0.0.dmg` (unsigned build — right-click → Open the first time)
-- **Linux:** `Hitbox-1.0.0.AppImage`
+- **Windows:** `Hitbox-1.0.1-Setup.exe` or the portable `.exe`
+- **macOS:** `Hitbox-1.0.1.dmg` (unsigned build — right-click → Open the first time)
+- **Linux:** `Hitbox-1.0.1.AppImage`
 
 ## Run from source
 
@@ -70,7 +71,7 @@ The workflow at `.github/workflows/release.yml` builds Windows, macOS and Linux 
 ```bash
 git init
 git add .
-git commit -m "HITBOX 1.0.0"
+git commit -m "HITBOX 1.0.1"
 git branch -M main
 git remote add origin https://github.com/toer15/hitbox-rl.git
 git push -u origin main
@@ -80,8 +81,8 @@ git push -u origin main
 3. Tag and push:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 The workflow uses the automatic `GITHUB_TOKEN` (no extra secrets) to build all three platforms and attach the installers to that tag's release with the GitHub CLI. You can also run **Release desktop app → Run workflow** manually to get downloadable artifacts without publishing a release.
