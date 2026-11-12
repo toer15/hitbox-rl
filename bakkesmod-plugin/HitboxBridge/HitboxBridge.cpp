@@ -13,7 +13,8 @@
 #include "bakkesmod/core/loadout_structs.h"
 #include "bakkesmod/utilities/LoadoutUtilities.h"
 
-BAKKESMOD_PLUGIN(HitboxBridge, "HITBOX bridge", "1.0", PLUGINTYPE_ALL)
+BAKKESMOD_PLUGIN(HitboxBridge, "HITBOX bridge", "1.0",
+	PLUGINTYPE_FREEPLAY | PLUGINTYPE_CUSTOM_TRAINING | PLUGINTYPE_THREADED)
 
 using namespace BakkesMod::Plugin;
 
