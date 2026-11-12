@@ -61,25 +61,25 @@ void HitboxBridge::onLoad()
 	cvarManager->registerNotifier("hitbox_reload", [this](const std::vector<std::string>&) {
 		ReloadFile();
 		cvarManager->log("[HITBOX] live file reloaded (rev " + std::to_string(live_.revision) + ").");
-	});
+	}, "Reload the HITBOX live loadout file", PERMISSION_ALL);
 	cvarManager->registerNotifier("hitbox_apply", [this](const std::vector<std::string>&) {
 		ApplyOnce(true);
-	});
+	}, "Apply the live loadout right now", PERMISSION_ALL);
 	cvarManager->registerNotifier("hitbox_tick", [this](const std::vector<std::string>&) {
 		ReloadFile();
 		ApplyOnce(false);
 		ScheduleNextTick();
-	});
+	}, "Internal tick used by the bridge loop", PERMISSION_ALL);
 	cvarManager->registerNotifier("hitbox_dumploadout", [this](const std::vector<std::string>&) {
 		DumpLoadout();
-	});
+	}, "Dump the currently equipped loadout product ids for the HITBOX app", PERMISSION_ALL);
 
 	// Re-apply whenever the game hands out a fresh loadout (car spawn, team
 	// change, map load). The tick loop keeps respawns in freeplay covered.
 	gameWrapper->HookEvent("Function TAGame.PRI_TA.OnLoadoutsSetInternal",
-		[this](void) { ApplyOnce(false); });
+		[this](std::string) { ApplyOnce(false); });
 	gameWrapper->HookEvent("Function TAGame.Car_TA.SetTeam",
-		[this](void) { ReloadFile(); ApplyOnce(false); });
+		[this](std::string) { ReloadFile(); ApplyOnce(false); });
 
 	ReloadFile();
 	WriteBridgeStatus();
