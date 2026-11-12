@@ -53,7 +53,7 @@ export default function App() {
   const [presetName, setPresetName] = useState('Octane · Blue');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [version, setVersion] = useState('1.0.1');
+  const [version, setVersion] = useState('1.0.2');
   const [modEnabled, setModEnabled] = useState<boolean>(readModEnabled);
   const [launching, setLaunching] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>({

@@ -31,15 +31,15 @@ Save loadouts locally, load them back, delete them, import and export `.rlpreset
 ### Updates
 Hitbox checks GitHub Releases eight seconds after launch and every six hours, downloads a new version in the background, and installs it when you quit. There is also a **Check updates** button in the top bar; when a build is ready it turns into **Restart update**.
 
-Auto-updates require the installed NSIS build on Windows. The portable `.exe` cannot self-update, and unsigned macOS builds cannot install updates until the app is code-signed.
+Auto-updates require the installed NSIS build on Windows. The Windows installer is a one-click per-user package, so updates install silently in the background and relaunch without showing an installer wizard. The portable `.exe` cannot self-update, and unsigned macOS builds cannot install updates until the app is code-signed.
 
 ## Download
 
 Grab the latest installer from the repository's **Releases** page:
 
-- **Windows:** `Hitbox-1.0.1-Setup.exe` or the portable `.exe`
-- **macOS:** `Hitbox-1.0.1.dmg` (unsigned build — right-click → Open the first time)
-- **Linux:** `Hitbox-1.0.1.AppImage`
+- **Windows:** `Hitbox-1.0.2-Setup.exe` or the portable `.exe`
+- **macOS:** `Hitbox-1.0.2.dmg` (unsigned build — right-click → Open the first time)
+- **Linux:** `Hitbox-1.0.2.AppImage`
 
 ## Run from source
 
@@ -71,7 +71,7 @@ The workflow at `.github/workflows/release.yml` builds Windows, macOS and Linux 
 ```bash
 git init
 git add .
-git commit -m "HITBOX 1.0.1"
+git commit -m "HITBOX 1.0.2"
 git branch -M main
 git remote add origin https://github.com/toer15/hitbox-rl.git
 git push -u origin main
@@ -81,8 +81,8 @@ git push -u origin main
 3. Tag and push:
 
 ```bash
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
 The workflow uses the automatic `GITHUB_TOKEN` (no extra secrets) to build all three platforms and attach the installers to that tag's release with the GitHub CLI. You can also run **Release desktop app → Run workflow** manually to get downloadable artifacts without publishing a release.

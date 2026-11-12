@@ -69,6 +69,7 @@ async function checkForUpdates() {
 function setupAutoUpdater() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoRunAppAfterInstall = true;
   autoUpdater.allowPrerelease = false;
 
   autoUpdater.on('checking-for-update', () => setUpdateState({ status: 'checking', error: null }));
@@ -613,7 +614,7 @@ app.whenReady().then(() => {
     if (updateState.status !== 'ready') {
       return { ok: false, error: 'No update is ready to install yet.' };
     }
-    setImmediate(() => autoUpdater.quitAndInstall());
+    setImmediate(() => autoUpdater.quitAndInstall(true, true));
     return { ok: true };
   });
 
