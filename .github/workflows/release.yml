@@ -59,40 +59,9 @@ jobs:
             release/latest*.yml
           if-no-files-found: error
 
-  bridge:
-    name: Build HITBOX bridge plugin
-    runs-on: windows-2022
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Build Release x64
-        shell: cmd
-        run: msbuild bakkesmod-plugin\HitboxBridge.vcxproj /p:Platform=x64 /p:Configuration=Release
-
-      - name: Locate the built dll
-        id: locate
-        shell: pwsh
-        run: |
-          $dll = Get-ChildItem -Path bakkesmod-plugin -Recurse -Filter 'HitboxBridge.dll' | Select-Object -First 1
-          if (-not $dll) { Write-Error 'HitboxBridge.dll was not built.' }
-          "dll_path=$($dll.FullName)" | Out-File $env:GITHUB_OUTPUT -Append
-
-      - name: Upload bridge artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: hitbox-bridge
-          path: ${{ steps.locate.outputs.dll_path }}
-          if-no-files-found: error
-
   publish:
     name: Publish GitHub release
-    needs: [build, bridge]
+    needs: [build]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
