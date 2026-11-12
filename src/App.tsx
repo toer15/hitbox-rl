@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { HitboxId, Loadout, Preset, UpdateState } from './types';
-import { CARS, HITBOXES, WORKSHOP_MAPS, getCar } from './data';
+import { BOOSTS, CARS, HITBOXES, WORKSHOP_MAPS, getBoost, getCar } from './data';
 import {
   DEFAULT_LOADOUT,
   exportPresetFile,
@@ -16,16 +16,18 @@ import { Garage } from './components/Garage';
 import { HitboxLab } from './components/HitboxLab';
 import { Library } from './components/Library';
 import { MapBrowser } from './components/MapBrowser';
+import { Setup } from './components/Setup';
 import { Logo } from './components/Logo';
 import { Icon } from './components/Icons';
 
-type Tab = 'garage' | 'hitboxes' | 'maps' | 'library';
+type Tab = 'garage' | 'hitboxes' | 'maps' | 'library' | 'setup';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'garage', label: 'Garage' },
   { id: 'hitboxes', label: 'Hitboxes' },
   { id: 'maps', label: 'Mod maps' },
   { id: 'library', label: 'Library' },
+  { id: 'setup', label: 'Setup' },
 ];
 
 const MOD_KEY = 'hitbox.modEnabled.v1';
@@ -45,6 +47,13 @@ interface ToastState {
   key: number;
 }
 
+interface ApplyState {
+  status: 'idle' | 'working' | 'ok' | 'error';
+  note: string | null;
+}
+
+const APPLY_IDLE: ApplyState = { status: 'idle', note: null };
+
 export default function App() {
   const [tab, setTab] = useState<Tab>('garage');
   const [loadout, setLoadout] = useState<Loadout>(DEFAULT_LOADOUT);
@@ -55,6 +64,8 @@ export default function App() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [version, setVersion] = useState('1.0.2');
   const [modEnabled, setModEnabled] = useState<boolean>(readModEnabled);
+  const [applyState, setApplyState] = useState<ApplyState>(APPLY_IDLE);
+  const [bridgeReady, setBridgeReady] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [updateState, setUpdateState] = useState<UpdateState>({
     status: 'idle',
@@ -107,6 +118,26 @@ export default function App() {
   const notify = (message: string, kind: 'ok' | 'error' = 'ok') => {
     setToast({ message, kind, key: Date.now() });
   };
+
+  useEffect(() => {
+    const api = window.hitboxDesktop;
+    if (!api) return;
+    let alive = true;
+    const poll = async () => {
+      try {
+        const status = await api.setupStatus();
+        if (alive) setBridgeReady(status.bridgePlugin === true);
+      } catch {
+        // The bridge status only drives the in-game card; keep last known.
+      }
+    };
+    void poll();
+    const timer = window.setInterval(poll, 10000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const previous = lastUpdateStatus.current;
@@ -258,11 +289,43 @@ export default function App() {
     setTab('garage');
   };
 
+  const applyToGame = async () => {
+    if (applyState.status === 'working') return;
+    setApplyState({ status: 'working', note: null });
+    const bodyProductId = (getCar(loadout.carId)?.productId ?? 0) || 0;
+    const boostProductId = (getBoost(loadout.boostId)?.productId ?? 0) || 0;
+    const hasMappedBody = bodyProductId > 0;
+    const result = await window.hitboxDesktop?.applyToGame({
+      enabled: modEnabled,
+      bodyProductId,
+      boostProductId,
+      primary: loadout.stockPaint ? null : loadout.primary,
+      secondary: loadout.stockPaint ? null : loadout.secondary,
+      asIs: loadout.stockPaint,
+    });
+    if (!result || !result.ok) {
+      setApplyState({ status: 'error', note: result?.error ?? 'Could not reach the bridge.' });
+      return;
+    }
+    const parts: string[] = [];
+    parts.push(modEnabled ? 'Loadout written to the bridge.' : 'Bridge switched off.');
+    if (modEnabled && hasMappedBody) {
+      parts.push('In freeplay the car is real (true hitbox). Online it is visual only.');
+    } else if (modEnabled && !hasMappedBody) {
+      parts.push(
+        `Item ids for “${getCar(loadout.carId)?.name}” are not mapped yet — paint/boost still apply. Equip it in freeplay and run hitbox_dumploadout to map it.`,
+      );
+    }
+    parts.push('If Rocket League is already running, give the bridge up to 2 seconds.');
+    setApplyState({ status: 'ok', note: parts.join(' ') });
+  };
+
   const counts: Record<Tab, number> = {
     garage: CARS.length,
     hitboxes: HITBOXES.length,
     maps: WORKSHOP_MAPS.length,
     library: presets.length,
+    setup: BOOSTS.length,
   };
 
   return (
@@ -349,12 +412,18 @@ export default function App() {
               hitboxFilter={hitboxFilter}
               onHitboxFilter={setHitboxFilter}
               onOpenHitboxLab={() => setTab('hitboxes')}
+              onApplyToGame={() => void applyToGame()}
+              applyState={applyState}
+              bridgeReady={bridgeReady}
+              onOpenSetup={() => setTab('setup')}
             />
           )}
 
           {tab === 'hitboxes' && <HitboxLab onBrowse={browseHitbox} />}
 
           {tab === 'maps' && <MapBrowser onNotify={notify} />}
+
+          {tab === 'setup' && <Setup onNotify={notify} />}
 
           {tab === 'library' && (
             <Library

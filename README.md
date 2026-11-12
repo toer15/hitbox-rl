@@ -2,10 +2,28 @@
 
 A desktop app for building client-side cosmetic loadouts and finding Rocket League workshop maps.
 
-**What it is:** a garage, a hitbox reference and a workshop map browser in one Electron app.
-**What it is not:** a game injector, an item unlocker, or a hitbox changer. Presets are clean JSON files; applying them in-game needs a separate client-side cosmetic mod.
+**What it is:** a garage, a hitbox reference and a workshop map browser in one Electron app — plus a built-in **Setup** tab that installs everything needed to actually show your loadout in game.
+**What it is not:** an item unlocker, and it never changes what other players see. Everything is client-side: only your screen changes.
 
 ![status](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3F9BFF)
+
+## Show it in game (Setup tab)
+
+The Setup tab walks through what HITBOX needs to put your loadout on screen in Rocket League, and installs it for you:
+
+1. **Rocket League** — auto-detected (Epic or Steam).
+2. **BakkesMod** — the community's long-standing client-side mod loader. One click downloads the official installer and starts it.
+3. **HITBOX bridge plugin** — a small plugin built by this repo (see the `bakkesmod-plugin/` folder, compiled by the `Build Hitbox bridge plugin` GitHub Actions workflow and attached to releases). One click downloads it into the BakkesMod plugins folder.
+
+After that, hit **Apply in game** in the Garage. The bridge reads the live loadout and applies it client-side:
+
+- **Paint** — any colour you picked (primary and secondary), applied as real colour overrides. The **As is** toggle leaves factory team paint alone.
+- **Boost** — any boost with a mapped product id.
+- **Car body** — in **freeplay / offline training** the chosen body is the real body, hitbox included. In **online matches** the server still owns the hitbox, so only the visuals change and your car handles like the body you actually have equipped.
+
+Console commands in game: , ,  (dumps your currently equipped item ids to  so new bodies/boosts can be mapped — see `src/data/productIds.ts`).
+
+The Mod maps tab also has an **Add map** box: paste any Steam Workshop link or item ID and HITBOX fetches the real title, author and size straight from Steam, so your shelf can hold every map the community has ever released, not just the curated list.
 
 ## What's inside
 

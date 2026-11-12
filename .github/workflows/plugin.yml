@@ -1,0 +1,44 @@
+name: Build Hitbox bridge plugin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bakkesmod-plugin/**'
+      - '.github/workflows/plugin.yml'
+  pull_request:
+    paths:
+      - 'bakkesmod-plugin/**'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  Build:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release x64
+        shell: cmd
+        run: msbuild bakkesmod-plugin\HitboxBridge.vcxproj /p:Platform=x64 /p:Configuration=Release
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HitboxBridge
+          path: bakkesmod-plugin/Build/x64/Release/HitboxBridge.dll
+
+      - name: Attach plugin to release
+        if: github.event_name == 'release'
+        shell: pwsh
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} bakkesmod-plugin/Build/x64/Release/HitboxBridge.dll --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

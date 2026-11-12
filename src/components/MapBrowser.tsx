@@ -46,20 +46,103 @@ function readFavorites(): string[] {
   }
 }
 
+const CUSTOM_MAPS_KEY = 'hitbox.customMaps.v1';
+
+interface CustomMap {
+  id: string;
+  name: string;
+  author: string;
+  sizeMB: number;
+  description: string;
+}
+
+function readCustomMaps(): CustomMap[] {
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_MAPS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is CustomMap => Boolean(item?.id && item?.name)) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function MapBrowser({ onNotify }: MapBrowserProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'All' | MapCategory>('All');
   const [difficulty, setDifficulty] = useState<'All' | MapDifficulty>('All');
   const [sort, setSort] = useState<SortMode>('featured');
   const [favorites, setFavorites] = useState<string[]>(readFavorites);
+  const [customMaps, setCustomMaps] = useState<CustomMap[]>(readCustomMaps);
+  const [workshopInput, setWorkshopInput] = useState('');
+  const [lookingUp, setLookingUp] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(CUSTOM_MAPS_KEY, JSON.stringify(customMaps));
+  }, [customMaps]);
+
+  const handleWorkshopAdd = async () => {
+    const raw = workshopInput.trim();
+    if (!raw) return;
+    const match = raw.match(/(?:id|\?id=|=|\/)(\d{5,12})/) ?? raw.match(/^(\d{5,12})$/);
+    const id = match ? match[1] : raw.replace(/\D/g, '');
+    if (!id || !/^\d{5,12}$/.test(id)) {
+      onNotify('Paste a Steam Workshop link or item number.', 'error');
+      return;
+    }
+    if (customMaps.some((entry) => entry.id === id) || WORKSHOP_MAPS.some((entry) => entry.id === id)) {
+      onNotify('That map is already in your list.');
+      setWorkshopInput('');
+      return;
+    }
+    setLookingUp(true);
+    try {
+      const result = await window.hitboxDesktop?.lookupWorkshopMap(id);
+      if (!result?.ok || !result.map) {
+        onNotify(result?.error ?? 'Could not fetch that workshop item.', 'error');
+        return;
+      }
+      setCustomMaps((current) => [
+        {
+          id: String(result.map!.id),
+          name: result.map!.name,
+          author: result.map!.author,
+          sizeMB: result.map!.sizeMB,
+          description: result.map!.description,
+        },
+        ...current,
+      ]);
+      setWorkshopInput('');
+      onNotify(`Added “${result.map.name}” to your maps.`);
+    } finally {
+      setLookingUp(false);
+    }
+  };
 
   useEffect(() => {
     window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
   }, [favorites]);
 
+  const allMaps = useMemo(
+    () => [
+      ...customMaps.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        author: entry.author,
+        category: 'Training' as MapCategory,
+        difficulty: 'Intermediate' as MapDifficulty,
+        players: '1+',
+        sizeMB: entry.sizeMB,
+        description: entry.description || 'Added from the Steam Workshop.',
+        featured: false,
+      })),
+      ...WORKSHOP_MAPS,
+    ],
+    [customMaps],
+  );
+
   const maps = useMemo(() => {
     const search = query.trim().toLowerCase();
-    const filtered = WORKSHOP_MAPS.filter((map) => {
+    const filtered = allMaps.filter((map) => {
       if (category !== 'All' && map.category !== category) return false;
       if (difficulty !== 'All' && map.difficulty !== difficulty) return false;
       if (!search) return true;
@@ -171,6 +254,28 @@ export function MapBrowser({ onNotify }: MapBrowserProps) {
           </select>
           <button className="btn ghost small" onClick={resetFilters}>
             Reset
+          </button>
+        </div>
+        <div className="map-search-row">
+          <div className="search map-search">
+            <Icon name="external" size={15} className="search-icon" />
+            <input
+              className="input"
+              value={workshopInput}
+              onChange={(event) => setWorkshopInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void handleWorkshopAdd();
+              }}
+              placeholder="Paste any Steam Workshop map link or ID to add it…"
+              aria-label="Add a workshop map by link"
+            />
+          </div>
+          <button
+            className="btn small"
+            disabled={lookingUp || !workshopInput.trim()}
+            onClick={() => void handleWorkshopAdd()}
+          >
+            <Icon name="download" size={13} /> {lookingUp ? 'Fetching…' : 'Add map'}
           </button>
         </div>
 

@@ -17,12 +17,16 @@ export interface Car {
   id: string;
   name: string;
   hitbox: HitboxId;
+  /** Game product id, used by the in-game bridge. 0 = not mapped yet. */
+  productId?: number;
 }
 
 export interface Boost {
   id: string;
   name: string;
   tone: string;
+  /** Game product id, used by the in-game bridge. 0 = not mapped yet. */
+  productId?: number;
 }
 
 export interface PaintFinish {
@@ -102,15 +106,44 @@ export interface UpdateResult {
   error?: string;
 }
 
+export interface WorkshopMapDetails {
+  id: string;
+  name: string;
+  author: string;
+  sizeMB: number;
+  description: string;
+  previewUrl?: string;
+  subscriptions?: number;
+}
+
 export interface DesktopResult<T = undefined> {
   ok: boolean;
   error?: string;
+  note?: string;
   canceled?: boolean;
   path?: string;
+  map?: WorkshopMapDetails;
   method?: 'epic' | 'steam' | 'executable';
   preset?: Preset;
   presets?: Preset[];
   value?: T;
+}
+
+export interface SetupStatus {
+  rocketLeague: string | null;
+  bakkesMod: boolean;
+  bridgePlugin: boolean;
+  bridgeFolder?: string;
+  bridgeStatus?: Record<string, string>;
+}
+
+export interface LiveApplyRequest {
+  enabled: boolean;
+  bodyProductId: number;
+  boostProductId: number;
+  primary: string | null;
+  secondary: string | null;
+  asIs: boolean;
 }
 
 export interface DesktopApi {
@@ -124,6 +157,13 @@ export interface DesktopApi {
   openMapsFolder: () => Promise<DesktopResult>;
   openExternal: (url: string) => Promise<DesktopResult>;
   launchGame: () => Promise<DesktopResult>;
+  setupStatus: () => Promise<SetupStatus>;
+  installBakkesMod: () => Promise<DesktopResult>;
+  installBridgePlugin: () => Promise<DesktopResult>;
+  applyToGame: (live: LiveApplyRequest) => Promise<DesktopResult>;
+  readLoadoutDump: () => Promise<DesktopResult>;
+  openBridgeFolder: () => Promise<DesktopResult>;
+  lookupWorkshopMap: (id: string) => Promise<DesktopResult>;
   checkForUpdates: () => Promise<UpdateResult>;
   installUpdate: () => Promise<DesktopResult>;
   getUpdateState: () => Promise<UpdateState>;

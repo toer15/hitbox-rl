@@ -1,5 +1,6 @@
 import type { Boost } from '../types';
 import { slugify } from '../lib/slug';
+import { BOOST_PRODUCT_IDS } from './productIds';
 
 /**
  * A broad catalog of Rocket League boost items, including standard drops,
@@ -175,6 +176,7 @@ function buildBoosts(): Boost[] {
       id: seen === 0 ? base : `${base}-${seen + 1}`,
       name,
       tone,
+      ...(BOOST_PRODUCT_IDS[name] ? { productId: BOOST_PRODUCT_IDS[name] } : {}),
     });
   }
 

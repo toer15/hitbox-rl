@@ -1,6 +1,7 @@
 'use strict';
 
 const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('electron');
+const https = require('node:https');
 const { autoUpdater } = require('electron-updater');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
@@ -11,6 +12,232 @@ const crypto = require('node:crypto');
 
 const PRESET_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const ALLOWED_HOSTS = new Set(['steamcommunity.com', 'store.steampowered.com']);
+const DOWNLOAD_HOSTS = new Set([
+  'github.com',
+  'api.github.com',
+  'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com',
+  'raw.githubusercontent.com',
+  'codeload.github.com',
+  'bakkesmod.com',
+  'api.steampowered.com',
+]);
+const BAKKESMOD_INSTALLER_URL =
+  'https://github.com/bakkesmodorg/BakkesModInjectorCpp/releases/latest/download/BakkesModSetup.zip';
+const HITBOX_REPO = 'toer15/hitbox-rl';
+const BRIDGE_DLL_NAME = 'HitboxBridge.dll';
+
+// ---------------------------------------------------------------------------
+// Game bridge: detection, one-click installs and the live loadout file.
+// ---------------------------------------------------------------------------
+
+function homeAppData() {
+  return process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+}
+
+function defaultBakkesModFolder() {
+  return path.join(homeAppData(), 'bakkesmod');
+}
+
+function bakkesModInstalled() {
+  return fsSync.existsSync(path.join(defaultBakkesModFolder(), 'bakkesmod.exe')) ||
+    fsSync.existsSync(path.join(defaultBakkesModFolder(), 'plugins'));
+}
+
+/** The plugin reports the real BakkesMod folder through a status file. */
+function readBridgeStatus() {
+  const statusPath = path.join(defaultBakkesModFolder(), 'hitbox_bridge.txt');
+  try {
+    const text = fsSync.readFileSync(statusPath, 'utf8');
+    const fields = {};
+    for (const line of text.split(/\r?\n/)) {
+      const eq = line.indexOf('=');
+      if (eq > 0) fields[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+    }
+    return fields;
+  } catch {
+    return {};
+  }
+}
+
+function bridgeFolder() {
+  const reported = readBridgeStatus().bmfolder;
+  if (reported && fsSync.existsSync(reported)) return reported;
+  return defaultBakkesModFolder();
+}
+
+function bridgePluginInstalled() {
+  return fsSync.existsSync(path.join(bridgeFolder(), 'plugins', BRIDGE_DLL_NAME));
+}
+
+function fetchUrl(url, redirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (redirects <= 0) {
+      reject(new Error('Too many redirects.'));
+      return;
+    }
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      reject(new Error('Bad URL.'));
+      return;
+    }
+    if (!DOWNLOAD_HOSTS.has(parsed.hostname)) {
+      reject(new Error(`Blocked download host: ${parsed.hostname}`));
+      return;
+    }
+    const request = https.get(url, { headers: { 'User-Agent': 'HitboxApp' } }, (response) => {
+      if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
+        response.resume();
+        const location = response.headers.location;
+        if (!location) {
+          reject(new Error('Redirect without location.'));
+          return;
+        }
+        resolve(fetchUrl(new URL(location, url).toString(), redirects - 1));
+        return;
+      }
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`Download failed (HTTP ${response.statusCode}).`));
+        return;
+      }
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+      response.on('error', reject);
+    });
+    request.on('error', reject);
+  });
+}
+
+function downloadToFile(url, destination) {
+  return fetchUrl(url).then((buffer) => fs.writeFile(destination, buffer));
+}
+
+function runInstaller(filePath) {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(filePath, [], { detached: true, stdio: 'ignore' });
+      child.once('error', (error) => resolve({ ok: false, error: String(error) }));
+      child.once('spawn', () => {
+        child.unref();
+        resolve({ ok: true });
+      });
+    } catch (error) {
+      resolve({ ok: false, error: String(error) });
+    }
+  });
+}
+
+async function extractZip(zipPath, destination) {
+  await fs.mkdir(destination, { recursive: true });
+  await new Promise((resolve, reject) => {
+    const child = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destination}' -Force`,
+      ],
+      { stdio: 'ignore' },
+    );
+    child.once('error', reject);
+    child.once('exit', (code) => (code === 0 ? resolve() : reject(new Error(`Expand-Archive exited with ${code}.`))));
+  });
+}
+
+async function latestBridgeAsset() {
+  const raw = await fetchUrl(`https://api.github.com/repos/${HITBOX_REPO}/releases/latest`);
+  const release = JSON.parse(raw.toString('utf8'));
+  const asset = (release.assets ?? []).find((entry) => entry.name === BRIDGE_DLL_NAME);
+  if (!asset) throw new Error('The HitboxBridge.dll has not been published yet. Build it with the plugin workflow first.');
+  return asset.browser_download_url;
+}
+
+async function writeLiveLoadout(live) {
+  const folder = bridgeFolder();
+  await fs.mkdir(path.join(folder, 'plugins'), { recursive: true });
+  const lines = [
+    `rev=${live.rev}`, `enabled=${live.enabled ? 1 : 0}`, `body=${live.bodyProductId}`,
+    `boost=${live.boostProductId}`, `asis=${live.asIs ? 1 : 0}`,
+  ];
+  if (live.primary) lines.push(`primary=${live.primary}`);
+  if (live.secondary) lines.push(`secondary=${live.secondary}`);
+  const livePath = path.join(folder, 'hitbox_live.txt');
+  await fs.writeFile(livePath, `${lines.join('\n')}\n`, 'utf8');
+  return livePath;
+}
+
+async function readDumpedLoadout() {
+  const dumpPath = path.join(bridgeFolder(), 'hitbox_dump.txt');
+  try {
+    const text = await fs.readFile(dumpPath, 'utf8');
+    const slots = {};
+    for (const line of text.split(/\r?\n/)) {
+      const slot = line.match(/slot=(-?\d+)/);
+      const product = line.match(/product=(\d+)/);
+      if (slot && product) slots[Number(slot[1])] = Number(product[1]);
+    }
+    return { ok: true, slots, path: dumpPath };
+  } catch {
+    return { ok: false, error: 'No dump found. In game (freeplay), run the console command: hitbox_dumploadout' };
+  }
+}
+
+function steamLookupWorkshop(id) {
+  const body = `itemcount=1&publishedfileids%5B0%5D=${id}`;
+  return new Promise((resolve) => {
+    try {
+      const request = https.request(
+        {
+          hostname: 'api.steampowered.com',
+          path: '/ISteamRemoteStorage/GetPublishedFileDetails/v1/',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(body),
+          },
+        },
+        (response) => {
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => {
+            try {
+              const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+              const details = parsed.response?.publishedfiledetails?.[0];
+              if (!details || details.result !== 1) {
+                resolve({ ok: false, error: 'Workshop item not found.' });
+                return;
+              }
+              resolve({
+                ok: true,
+                map: {
+                  id: String(details.publishedfileid ?? id),
+                  name: details.title ?? 'Workshop map',
+                  author: details.creator ?? '',
+                  sizeMB: Math.round((details.file_size ?? 0) / 1024 / 1024),
+                  description: String(details.short_description ?? '').slice(0, 300),
+                  previewUrl: details.preview_url ?? '',
+                  subscriptions: details.subscriptions ?? 0,
+                },
+              });
+            } catch (error) {
+              resolve({ ok: false, error: String(error) });
+            }
+          });
+        },
+      );
+      request.on('error', (error) => resolve({ ok: false, error: String(error) }));
+      request.write(body);
+      request.end();
+    } catch (error) {
+      resolve({ ok: false, error: String(error) });
+    }
+  });
+}
 const IS_PORTABLE = Boolean(process.env.PORTABLE_EXECUTABLE_DIR);
 const STEAM_LAUNCH_URI = 'steam://rungameid/252950';
 const EPIC_LAUNCH_URI =
@@ -607,6 +834,87 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('game:launch', () => launchRocketLeague());
+
+  ipcMain.handle('setup:status', () => ({
+    rocketLeague: findEpicRocketLeague() ?? findSteamRocketLeague()?.executable ?? null,
+    bakkesMod: bakkesModInstalled(),
+    bridgePlugin: bridgePluginInstalled(),
+    bridgeFolder: bridgeFolder(),
+    bridgeStatus: readBridgeStatus(),
+  }));
+
+  ipcMain.handle('setup:installBakkesMod', async () => {
+    try {
+      const tempZip = path.join(os.tmpdir(), 'BakkesModSetup.zip');
+      await downloadToFile(BAKKESMOD_INSTALLER_URL, tempZip);
+      const tempDir = path.join(os.tmpdir(), 'bakkesmod-setup');
+      await extractZip(tempZip, tempDir);
+      const entries = await fs.readdir(tempDir);
+      const setup = entries.find((entry) => /setup\.exe$/i.test(entry));
+      if (!setup) throw new Error('The BakkesMod installer did not extract a setup exe.');
+      const result = await runInstaller(path.join(tempDir, setup));
+      if (!result.ok) return result;
+      return {
+        ok: true,
+        note: 'BakkesMod setup is running. Finish its wizard, then click Re-check here.',
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('setup:installPlugin', async () => {
+    if (!bakkesModInstalled()) {
+      return { ok: false, error: 'Install BakkesMod first (step 2).' };
+    }
+    try {
+      const url = await latestBridgeAsset();
+      const pluginsDir = path.join(bridgeFolder(), 'plugins');
+      await fs.mkdir(pluginsDir, { recursive: true });
+      await downloadToFile(url, path.join(pluginsDir, BRIDGE_DLL_NAME));
+      return {
+        ok: true,
+        note: 'Bridge installed. Restart Rocket League (or press F5 in the BakkesMod console) to load it.',
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('bridge:apply', async (_event, live) => {
+    if (!live || typeof live !== 'object') return { ok: false, error: 'Invalid live loadout.' };
+    if (!bridgePluginInstalled()) {
+      return { ok: false, error: 'The HITBOX bridge plugin is not installed yet (Setup).' };
+    }
+    try {
+      const livePath = await writeLiveLoadout({
+        rev: Date.now() % 1000000000,
+        enabled: live.enabled === true,
+        bodyProductId: Number(live.bodyProductId) || 0,
+        boostProductId: Number(live.boostProductId) || 0,
+        asIs: live.asIs === true,
+        primary: typeof live.primary === 'string' && /^#[0-9a-fA-F]{6}$/.test(live.primary) ? live.primary : null,
+        secondary: typeof live.secondary === 'string' && /^#[0-9a-fA-F]{6}$/.test(live.secondary) ? live.secondary : null,
+      });
+      return { ok: true, path: livePath };
+    } catch (error) {
+      return { ok: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('bridge:readDump', () => readDumpedLoadout());
+
+  ipcMain.handle('bridge:openFolder', async () => {
+    const error = await shell.openPath(bridgeFolder());
+    return error ? { ok: false, error } : { ok: true, path: bridgeFolder() };
+  });
+
+  ipcMain.handle('maps:lookup', async (_event, id) => {
+    if (typeof id !== 'string' || !/^\d{5,12}$/.test(id.trim())) {
+      return { ok: false, error: 'Paste a Steam Workshop link or item number.' };
+    }
+    return steamLookupWorkshop(id.trim());
+  });
 
   ipcMain.handle('updates:state', () => updateState);
   ipcMain.handle('updates:check', () => checkForUpdates());

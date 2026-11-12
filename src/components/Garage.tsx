@@ -31,6 +31,10 @@ interface GarageProps {
   hitboxFilter: HitboxId | 'all';
   onHitboxFilter: (id: HitboxId | 'all') => void;
   onOpenHitboxLab: () => void;
+  onApplyToGame: () => void;
+  applyState: { status: 'idle' | 'working' | 'ok' | 'error'; note: string | null };
+  bridgeReady: boolean;
+  onOpenSetup: () => void;
 }
 
 type PaintTarget = 'primary' | 'secondary';
@@ -51,6 +55,10 @@ export function Garage({
   hitboxFilter,
   onHitboxFilter,
   onOpenHitboxLab,
+  onApplyToGame,
+  applyState,
+  bridgeReady,
+  onOpenSetup,
 }: GarageProps) {
   const [carQuery, setCarQuery] = useState('');
   const [boostQuery, setBoostQuery] = useState('');
@@ -261,6 +269,46 @@ export function Garage({
           <p className="hint">
             Stored locally as a <code>.json</code> preset. Cosmetics stay on your screen only.
           </p>
+        </section>
+
+        <section className="panel apply-card">
+          <div className="eyebrow">
+            <b>↳</b> In game
+          </div>
+          <div className="panel-title">Show it in Rocket League</div>
+          {bridgeReady ? (
+            <>
+              <div className="save-actions">
+                <button
+                  className="btn primary"
+                  onClick={onApplyToGame}
+                  disabled={applyState.status === 'working'}
+                >
+                  <Icon name="power" size={14} />
+                  {applyState.status === 'working' ? 'Applying…' : 'Apply in game'}
+                </button>
+              </div>
+              {applyState.note && (
+                <p className={`hint ${applyState.status === 'error' ? 'error' : ''}`}>{applyState.note}</p>
+              )}
+              <p className="hint">
+                Freeplay / offline: the car is real, so you get its <b>true hitbox</b>. Online: only what you
+                see changes; the hitbox still follows the body you actually have equipped.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="hint">
+                To see this loadout in game, the HITBOX bridge needs a one-time setup: BakkesMod + the bridge
+                plugin. HITBOX can install both for you.
+              </p>
+              <div className="save-actions">
+                <button className="btn primary" onClick={onOpenSetup}>
+                  <Icon name="download" size={14} /> Open setup
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </aside>
 

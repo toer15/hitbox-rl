@@ -2236,3 +2236,75 @@ h2 {
     transform: translateY(0);
   }
 }
+
+/* ---- Setup wizard + in-game apply card ---- */
+.setup-wrap,
+.apply-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.setup-step.done {
+  border-color: rgba(60, 220, 140, 0.35);
+  background: rgba(60, 220, 140, 0.06);
+}
+
+.setup-led {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5f6d;
+  box-shadow: 0 0 8px rgba(255, 95, 109, 0.6);
+}
+
+.setup-step.done .setup-led {
+  background: #3cdc8c;
+  box-shadow: 0 0 8px rgba(60, 220, 140, 0.6);
+}
+
+.setup-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.setup-copy b {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.setup-copy p {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(233, 240, 250, 0.65);
+  line-height: 1.45;
+}
+
+.apply-card .hint.error {
+  color: #ff8d97;
+}
+
+.setup-card .hint code {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11.5px;
+}
