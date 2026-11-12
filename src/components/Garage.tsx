@@ -277,8 +277,28 @@ export function Garage({
           {velocityReady ? (
             <>
               <div className="save-actions">
-                <button className="btn primary" onClick={onOpenVelocity}>
-                  <Icon name="play" size={14} /> Open VelocityRL
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    // Isolate the current setup/preview selections. These reflect
+                    // what the user picked in the UI right now, without committing
+                    // anything to the persistent loadout state.
+                    const setupPayload = {
+                      carId: car.id,
+                      carName: car.name,
+                      hitbox: hitbox.id,
+                      boostId: boost?.id ?? null,
+                      team: loadout.team,
+                      primaryColor: primary,
+                      secondaryColor: secondary,
+                      finishPrimary,
+                      finishSecondary,
+                    };
+                    console.log('[HITBOX] preparing setup handoff:', setupPayload);
+                    onOpenVelocity();
+                  }}
+                >
+                  <Icon name="play" size={14} /> Send to game
                 </button>
               </div>
               <p className="hint">
