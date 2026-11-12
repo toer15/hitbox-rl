@@ -22,10 +22,13 @@ const DOWNLOAD_HOSTS = new Set([
   'api.steampowered.com',
 ]);
 const VELOCITY_RELEASE_API = 'https://api.github.com/repos/bitsfdb/VelocityRL/releases/latest';
+const VELOCITY_APP_EXE = 'velocity-rl.exe';
 const VELOCITY_APP_DIR_CANDIDATES = [
+  () => path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'VelocityRL'),
+  () => path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'VelocityRL'),
   () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'velocity-rl'),
-  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'VelocityRL'),
-  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'velocity'),
+  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'VelocityRL'),
+  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'velocity'),
 ];
 
 function velocityInstalled() {
@@ -39,6 +42,15 @@ function velocityInstalled() {
       // Candidate path not readable; try the next.
     }
   }
+  // Last resort: the default install path (velocity-rl.exe next to uninstall.exe).
+  try {
+    const defaultInstall = path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'VelocityRL');
+    if (fsSync.existsSync(path.join(defaultInstall, VELOCITY_APP_EXE))) {
+      return defaultInstall;
+    }
+  } catch {
+    // Ignore.
+  }
   return null;
 }
 
@@ -46,6 +58,9 @@ function velocityExecutable() {
   const dir = velocityInstalled();
   if (!dir) return null;
   try {
+    // Prefer the exact app exe name, falling back to any non-uninstaller exe.
+    const exact = path.join(dir, VELOCITY_APP_EXE);
+    if (fsSync.existsSync(exact)) return exact;
     const exe = fsSync.readdirSync(dir).find((entry) => /\.exe$/i.test(entry) && !/uninstall/i.test(entry));
     return exe ? path.join(dir, exe) : null;
   } catch {
