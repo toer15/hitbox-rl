@@ -59,6 +59,10 @@ export function Setup({ onNotify }: SetupProps) {
 
   useEffect(() => {
     void refresh();
+    // Keep checking while the Setup tab is open: installers run in their own
+    // window, so steps must flip to "Installed" on their own when they finish.
+    const timer = window.setInterval(() => void refresh(), 3000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const handleAction = async (id: number) => {
