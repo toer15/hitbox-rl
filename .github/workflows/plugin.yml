@@ -30,25 +30,33 @@ jobs:
         run: msbuild bakkesmod-plugin\HitboxBridge.vcxproj /p:Platform=x64 /p:Configuration=Release /flp:logfile=build.log;verbosity=normal
         continue-on-error: true
 
-      - name: Fail if the dll was not produced
+      - name: Locate and verify the built dll
+        id: locate
         if: always()
         shell: pwsh
         run: |
-          if (-not (Test-Path 'bakkesmod-plugin/Build/x64/Release/HitboxBridge.dll')) {
+          $dll = Get-ChildItem -Path . -Recurse -Filter 'HitboxBridge.dll' |
+            Where-Object { $_.FullName -notmatch 'node_modules' } |
+            Select-Object -First 1
+          if (-not $dll) {
+            Get-ChildItem -Path . -Recurse -Include '*.dll','*.log' |
+              Where-Object { $_.FullName -notmatch 'node_modules' } |
+              ForEach-Object { $_.FullName } | Out-File $env:GITHUB_STEP_SUMMARY -Append
             Write-Error 'HitboxBridge.dll was not built.'
           }
+          "dll_path=$($dll.FullName)" | Out-File $env:GITHUB_OUTPUT -Append
 
       - name: Upload plugin artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HitboxBridge
-          path: bakkesmod-plugin/Build/x64/Release/HitboxBridge.dll
+          path: ${{ steps.locate.outputs.dll_path }}
 
       - name: Attach plugin to release
         if: github.event_name == 'release'
         shell: pwsh
         run: |
-          gh release upload ${{ github.event.release.tag_name }} bakkesmod-plugin/Build/x64/Release/HitboxBridge.dll --clobber
+          gh release upload ${{ github.event.release.tag_name }} "${{ steps.locate.outputs.dll_path }}" --clobber
         env:
           GH_TOKEN: ${{ github.token }}
