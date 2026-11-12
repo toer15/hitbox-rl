@@ -11,7 +11,7 @@ interface Step {
   title: string;
   detail: string;
   done: boolean;
-  action?: 'bakkesmod' | 'plugin' | 'open';
+  action?: 'rl' | 'bakkesmod' | 'plugin' | 'open';
   actionLabel?: string;
 }
 
