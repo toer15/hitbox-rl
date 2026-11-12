@@ -25,13 +25,18 @@ function StepRow({ step, busy, onAction }: { step: Step; busy: boolean; onAction
         </b>
         <p>{step.detail}</p>
       </div>
+      {step.done && <span className="saved-badge">Done</span>}
       {step.action && !step.done && (
         <button className="btn small primary" disabled={busy} onClick={() => onAction(step.id)}>
           <Icon name="download" size={12} />
           {busy ? 'Working…' : step.actionLabel}
         </button>
       )}
-      {step.action && step.done && <span className="saved-badge">Installed</span>}
+      {step.action && step.done && (
+        <button className="btn small installed-btn" disabled title="Already installed — nothing more to do">
+          <Icon name="check" size={12} /> Installed
+        </button>
+      )}
     </div>
   );
 }

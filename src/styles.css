@@ -2308,3 +2308,21 @@ h2 {
   border-radius: 6px;
   font-size: 11.5px;
 }
+
+/* Installed steps: greyed out, clearly done */
+.setup-step.done .setup-copy {
+  opacity: 0.75;
+}
+
+.setup-step.done .setup-copy p {
+  color: rgba(233, 240, 250, 0.5);
+}
+
+.installed-btn {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+  color: rgba(233, 240, 250, 0.8);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
