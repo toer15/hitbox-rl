@@ -73,7 +73,9 @@ export function Setup({ onNotify }: SetupProps) {
             ? await api.installBakkesMod()
             : id === 3
               ? await api.installBridgePlugin()
-              : { ok: true };
+              : id === 4
+                ? await api.installVelocity()
+                : { ok: true };
       if (!result.ok) onNotify(result.error ?? 'Setup step failed.', 'error');
       else if (result.note) onNotify(result.note);
       else onNotify('Done.');
@@ -102,6 +104,7 @@ export function Setup({ onNotify }: SetupProps) {
   const rl = status?.rocketLeague ?? null;
   const bakkes = status?.bakkesMod ?? false;
   const plugin = status?.bridgePlugin ?? false;
+  const velocity = status?.velocity ?? null;
 
   const steps: Step[] = [
     {
@@ -172,6 +175,30 @@ export function Setup({ onNotify }: SetupProps) {
             <code>hitbox_reload</code>, <code>hitbox_apply</code>, <code>hitbox_dumploadout</code>.
           </p>
         )}
+
+        <section className="setup-alt">
+          <div className="setup-alt-head">
+            <div>
+              <b>Plan B — VelocityRL (never out of date)</b>
+              <p>
+                If BakkesMod is “out of date, waiting for an update” after a Rocket League patch, VelocityRL is a
+                free, open-source item spawner and preset app that is maintained daily and does not depend on
+                BakkesMod at all. Spawn any car body, boost, paint or title client-side, save presets, and restore
+                everything with one click.
+              </p>
+            </div>
+            {velocity ? (
+              <button className="btn small installed-btn" disabled title="Already installed — launch it from the Start menu">
+                <Icon name="check" size={12} /> Installed
+              </button>
+            ) : (
+              <button className="btn small primary" disabled={busy === 4} onClick={() => void handleAction(4)}>
+                <Icon name="download" size={12} /> {busy === 4 ? 'Working…' : 'Download & install'}
+              </button>
+            )}
+          </div>
+          {velocity && <p className="hint">Found at <code>{velocity}</code></p>}
+        </section>
 
         {allDone && (
           <div className="save-actions">

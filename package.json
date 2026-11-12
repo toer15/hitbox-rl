@@ -1,7 +1,7 @@
 {
   "name": "hitbox-rl",
   "productName": "Hitbox",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "description": "A desktop loadout studio and workshop map browser for Rocket League.",
   "author": {

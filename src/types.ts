@@ -133,6 +133,8 @@ export interface SetupStatus {
   rocketLeague: string | null;
   bakkesMod: boolean;
   bridgePlugin: boolean;
+  /** Install dir of the VelocityRL alternative (null when not installed). */
+  velocity?: string | null;
   bridgeFolder?: string;
   bridgeStatus?: Record<string, string>;
 }
@@ -161,6 +163,7 @@ export interface DesktopApi {
   browseRocketLeague: () => Promise<DesktopResult>;
   installBakkesMod: () => Promise<DesktopResult>;
   installBridgePlugin: () => Promise<DesktopResult>;
+  installVelocity: () => Promise<DesktopResult>;
   applyToGame: (live: LiveApplyRequest) => Promise<DesktopResult>;
   readLoadoutDump: () => Promise<DesktopResult>;
   openBridgeFolder: () => Promise<DesktopResult>;

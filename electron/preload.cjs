@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('hitboxDesktop', {
   browseRocketLeague: () => ipcRenderer.invoke('setup:browseRocketLeague'),
   installBakkesMod: () => ipcRenderer.invoke('setup:installBakkesMod'),
   installBridgePlugin: () => ipcRenderer.invoke('setup:installPlugin'),
+  installVelocity: () => ipcRenderer.invoke('setup:installVelocity'),
   applyToGame: (live) => ipcRenderer.invoke('bridge:apply', live),
   readLoadoutDump: () => ipcRenderer.invoke('bridge:readDump'),
   openBridgeFolder: () => ipcRenderer.invoke('bridge:openFolder'),

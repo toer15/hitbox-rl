@@ -24,6 +24,34 @@ const DOWNLOAD_HOSTS = new Set([
 ]);
 const BAKKESMOD_INSTALLER_URL =
   'https://github.com/bakkesmodorg/BakkesModInjectorCpp/releases/latest/download/BakkesModSetup.zip';
+const VELOCITY_RELEASE_API = 'https://api.github.com/repos/bitsfdb/VelocityRL/releases/latest';
+const VELOCITY_APP_DIR_CANDIDATES = [
+  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'Programs', 'velocity-rl'),
+  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'VelocityRL'),
+  () => path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'velocity'),
+];
+
+function velocityInstalled() {
+  for (const candidate of VELOCITY_APP_DIR_CANDIDATES) {
+    try {
+      const dir = candidate();
+      if (fsSync.existsSync(dir) && fsSync.readdirSync(dir).some((entry) => /\.exe$/i.test(entry))) {
+        return dir;
+      }
+    } catch {
+      // Candidate path not readable; try the next.
+    }
+  }
+  return null;
+}
+
+async function latestVelocityInstaller() {
+  const raw = await fetchUrl(VELOCITY_RELEASE_API);
+  const release = JSON.parse(raw.toString('utf8'));
+  const asset = (release.assets ?? []).find((entry) => /setup\.exe$/i.test(entry.name));
+  if (!asset) throw new Error('VelocityRL has no Windows installer in its latest release right now.');
+  return asset.browser_download_url;
+}
 const HITBOX_REPO = 'toer15/hitbox-rl';
 const BRIDGE_DLL_NAME = 'HitboxBridge.dll';
 
@@ -917,6 +945,7 @@ app.whenReady().then(() => {
     rocketLeague: findAnyRocketLeague(),
     bakkesMod: bakkesModInstalled(),
     bridgePlugin: bridgePluginInstalled(),
+    velocity: velocityInstalled(),
     bridgeFolder: bridgeFolder(),
     bridgeStatus: readBridgeStatus(),
   }));
@@ -953,6 +982,22 @@ app.whenReady().then(() => {
       return {
         ok: true,
         note: 'Bridge installed. Restart Rocket League (or press F5 in the BakkesMod console) to load it.',
+      };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('setup:installVelocity', async () => {
+    try {
+      const url = await latestVelocityInstaller();
+      const installer = path.join(os.tmpdir(), 'VelocityRL-setup.exe');
+      await downloadToFile(url, installer);
+      const result = await runInstaller(installer);
+      if (!result.ok) return result;
+      return {
+        ok: true,
+        note: 'VelocityRL setup is running. Finish its wizard — it is maintained daily, so it never waits for a BakkesMod update.',
       };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
