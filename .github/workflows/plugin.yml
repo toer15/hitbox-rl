@@ -30,36 +30,8 @@ jobs:
         run: msbuild bakkesmod-plugin\HitboxBridge.vcxproj /p:Platform=x64 /p:Configuration=Release /flp:logfile=build.log;verbosity=normal
         continue-on-error: true
 
-      - name: Publish errors to job summary
-        if: always()
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if (Test-Path build.log) {
-            $lines = Get-Content build.log
-            $errors = $lines | Select-String -Pattern 'error' -Context 2,4
-            $body = ''
-            if ($errors) {
-              "### MSBuild errors" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-              $body = ($errors | ForEach-Object { ($_.Context.PreContext + $_.Line + $_.Context.PostContext) -join "`n" }) -join "`n`n"
-              $body | Out-File $env:GITHUB_STEP_SUMMARY -Append
-            } else {
-              "No 'error' lines found in build.log. Last 40 lines:" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-              $body = ($lines | Select-Object -Last 40) -join "`n"
-              $body | Out-File $env:GITHUB_STEP_SUMMARY -Append
-            }
-            if ($body) {
-              $payload = @{ body = "``````n$body``````" } | ConvertTo-Json
-              Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/comments" `
-                -Method Post -Body $payload -ContentType 'application/json' `
-                -Headers @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' } | Out-Null
-            }
-          } else {
-            "build.log was not created." | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          }
-
       - name: Fail if the dll was not produced
+        if: always()
         shell: pwsh
         run: |
           if (-not (Test-Path 'bakkesmod-plugin/Build/x64/Release/HitboxBridge.dll')) {
@@ -67,6 +39,7 @@ jobs:
           }
 
       - name: Upload plugin artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: HitboxBridge
