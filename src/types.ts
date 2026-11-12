@@ -158,6 +158,7 @@ export interface DesktopApi {
   openExternal: (url: string) => Promise<DesktopResult>;
   launchGame: () => Promise<DesktopResult>;
   setupStatus: () => Promise<SetupStatus>;
+  browseRocketLeague: () => Promise<DesktopResult>;
   installBakkesMod: () => Promise<DesktopResult>;
   installBridgePlugin: () => Promise<DesktopResult>;
   applyToGame: (live: LiveApplyRequest) => Promise<DesktopResult>;

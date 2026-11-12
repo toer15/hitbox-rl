@@ -67,7 +67,13 @@ export function Setup({ onNotify }: SetupProps) {
     setBusy(id);
     try {
       const result: DesktopResult =
-        id === 2 ? await api.installBakkesMod() : id === 3 ? await api.installBridgePlugin() : { ok: true };
+        id === 1
+          ? await api.browseRocketLeague()
+          : id === 2
+            ? await api.installBakkesMod()
+            : id === 3
+              ? await api.installBridgePlugin()
+              : { ok: true };
       if (!result.ok) onNotify(result.error ?? 'Setup step failed.', 'error');
       else if (result.note) onNotify(result.note);
       else onNotify('Done.');
@@ -103,8 +109,10 @@ export function Setup({ onNotify }: SetupProps) {
       title: 'Rocket League',
       detail: rl
         ? `Found at ${rl}`
-        : 'HITBOX could not find Rocket League. Install it through Epic or Steam, launch it once, then come back.',
+        : 'HITBOX could not find Rocket League automatically. Browse to RocketLeague.exe (inside Binaries\\Win64) and HITBOX will remember it forever.',
       done: Boolean(rl),
+      action: 'rl',
+      actionLabel: 'Browse for RL',
     },
     {
       id: 2,

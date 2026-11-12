@@ -486,6 +486,64 @@ function findSteamRocketLeague() {
   return null;
 }
 
+/**
+ * People install Rocket League in all kinds of places (D:\rocketleague,
+ * D:\Games\..., custom Steam libraries...). Scan the usual drive shapes.
+ */
+function findDriveRocketLeague() {
+  const drives = ['C:', 'D:', 'E:', 'F:'];
+  const prefixes = [
+    '',
+    'Games',
+    'Games\\',
+    'Epic Games\\',
+    'Steam\\steamapps\\common\\',
+    'SteamLibrary\\steamapps\\common\\',
+    'Games\\Steam\\steamapps\\common\\',
+    'Games\\SteamLibrary\\steamapps\\common\\',
+    'Program Files\\Epic Games\\',
+    'Program Files (x86)\\Epic Games\\',
+    'Steam Library\\steamapps\\common\\',
+  ];
+  const folderNames = ['rocketleague', 'Rocket League', 'RocketLeague'];
+  for (const drive of drives) {
+    for (const prefix of prefixes) {
+      for (const folder of folderNames) {
+        const candidate = `${drive}\\${prefix}${folder}\\Binaries\\Win64\\RocketLeague.exe`;
+        try {
+          if (fsSync.existsSync(candidate)) return candidate;
+        } catch {
+          // Unreadable drive letter; move on.
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function manualRocketLeagueFile() {
+  return path.join(app.getPath('userData'), 'rocket-league-path.txt');
+}
+
+function readManualRocketLeague() {
+  try {
+    const exe = fsSync.readFileSync(manualRocketLeagueFile(), 'utf8').trim();
+    if (exe && /RocketLeague\.exe$/i.test(exe) && fsSync.existsSync(exe)) return exe;
+  } catch {
+    // No manual pick saved yet.
+  }
+  return null;
+}
+
+function findAnyRocketLeague() {
+  return (
+    readManualRocketLeague() ??
+    findEpicRocketLeague() ??
+    findSteamRocketLeague()?.executable ??
+    findDriveRocketLeague()
+  );
+}
+
 function hasEpicLauncher() {
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
   const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
@@ -835,8 +893,28 @@ app.whenReady().then(() => {
 
   ipcMain.handle('game:launch', () => launchRocketLeague());
 
+  ipcMain.handle('setup:browseRocketLeague', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(window, {
+      title: 'Select RocketLeague.exe',
+      properties: ['openFile'],
+      filters: [{ name: 'Rocket League executable', extensions: ['exe'] }],
+    });
+    if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+    const exe = result.filePaths[0];
+    if (!/RocketLeague\.exe$/i.test(exe)) {
+      return { ok: false, error: 'That is not RocketLeague.exe. Pick the file inside Binaries\\Win64.' };
+    }
+    try {
+      await fs.writeFile(manualRocketLeagueFile(), `${exe}\n`, 'utf8');
+      return { ok: true, path: exe };
+    } catch (error) {
+      return { ok: false, error: String(error) };
+    }
+  });
+
   ipcMain.handle('setup:status', () => ({
-    rocketLeague: findEpicRocketLeague() ?? findSteamRocketLeague()?.executable ?? null,
+    rocketLeague: findAnyRocketLeague(),
     bakkesMod: bakkesModInstalled(),
     bridgePlugin: bridgePluginInstalled(),
     bridgeFolder: bridgeFolder(),

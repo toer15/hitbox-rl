@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('hitboxDesktop', {
   openExternal: (url) => ipcRenderer.invoke('maps:openExternal', url),
   launchGame: () => ipcRenderer.invoke('game:launch'),
   setupStatus: () => ipcRenderer.invoke('setup:status'),
+  browseRocketLeague: () => ipcRenderer.invoke('setup:browseRocketLeague'),
   installBakkesMod: () => ipcRenderer.invoke('setup:installBakkesMod'),
   installBridgePlugin: () => ipcRenderer.invoke('setup:installPlugin'),
   applyToGame: (live) => ipcRenderer.invoke('bridge:apply', live),
